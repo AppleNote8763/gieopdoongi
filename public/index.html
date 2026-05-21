@@ -151,12 +151,20 @@
 
               <label class="field">
                 <span>현재 보유 기술/역량</span>
-                <textarea
-                  id="skills"
-                  name="skills"
-                  rows="5"
-                  placeholder="예: JavaScript, Node.js, SQL, 팀 프로젝트 경험"
-                ></textarea>
+                <div class="company-search-row">
+                  <input
+                    id="skills"
+                    name="skills"
+                    type="text"
+                    placeholder="추천 목록에 없으면 직접 입력하세요"
+                    autocomplete="off"
+                  />
+                  <button class="secondary-button compact-button" id="suggestSkillsButton" type="button">
+                    역량 찾기
+                  </button>
+                </div>
+                <small class="helper-text" id="skillHint">직무를 선택한 뒤 역량 찾기를 누르면 필요한 역량을 체크할 수 있습니다.</small>
+                <div class="skill-suggestions" id="skillSuggestions"></div>
                 <small class="error-text"></small>
               </label>
 

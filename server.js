@@ -22,7 +22,7 @@ const supabaseAdmin =
     : null;
 
 function validateGoalInput(body) {
-  const required = ["company", "jobRole", "skills", "level"];
+  const required = ["company", "jobRole", "level"];
   const missing = required.filter((key) => !String(body[key] || "").trim());
 
   if (missing.length > 0) {
@@ -55,6 +55,8 @@ async function requireAuth(req, res, next) {
 }
 
 function getFallbackRoadmap({ company, jobRole, skills, level }) {
+  const currentSkills = skills || "현재 보유 역량";
+
   return {
     coreSkills: [
       `${jobRole} 직무 핵심 기술`,
@@ -63,7 +65,7 @@ function getFallbackRoadmap({ company, jobRole, skills, level }) {
       `${company} 서비스와 채용 공고 기반 도메인 이해`
     ],
     gaps: [
-      `${skills}를 실무 결과물로 보여주는 포트폴리오 보강`,
+      `${currentSkills}를 실무 결과물로 보여주는 포트폴리오 보강`,
       "프로젝트 의사결정 과정을 면접에서 설명하는 연습",
       "채용 공고 요구 역량과 현재 역량 사이의 우선순위 정리"
     ],
@@ -113,7 +115,7 @@ function getFallbackRoadmap({ company, jobRole, skills, level }) {
       }
     ],
     portfolioDirection:
-      `${company}의 ${jobRole} 업무와 연결되는 문제를 정하고, ${skills}를 활용해 작동 결과와 의사결정 과정을 함께 보여주세요.`,
+      `${company}의 ${jobRole} 업무와 연결되는 문제를 정하고, ${currentSkills}를 활용해 작동 결과와 의사결정 과정을 함께 보여주세요.`,
     interviewItems: [
       "자기소개와 지원 동기",
       "핵심 기술 개념 설명",
@@ -264,6 +266,74 @@ function getFallbackRoles(company) {
   ];
 }
 
+function getFallbackSkills(company, jobRole) {
+  const value = `${company} ${jobRole}`.toLowerCase();
+
+  if (/(hyundai|kia|automotive|mobility|motor|vehicle|car|ev|현대자동차|현대차|기아|자동차|모빌리티|전기차|자율주행|차량|adas|전동화)/i.test(value)) {
+    return [
+      "차량 제어 기초",
+      "임베디드 C/C++",
+      "CAN 통신 이해",
+      "센서 데이터 처리",
+      "전기전자 회로 기초",
+      "MATLAB/Simulink",
+      "Python 데이터 분석",
+      "품질 문제 해결 역량",
+      "자동차 산업 도메인 이해"
+    ];
+  }
+
+  if (/(data|데이터|분석|analytics|scientist)/i.test(value)) {
+    return [
+      "SQL",
+      "Python",
+      "통계 기초",
+      "데이터 시각화",
+      "대시보드 작성",
+      "A/B 테스트 이해",
+      "비즈니스 문제 정의",
+      "데이터 전처리"
+    ];
+  }
+
+  if (/(backend|server|백엔드|서버)/i.test(value)) {
+    return [
+      "HTTP/API 설계",
+      "Node.js 또는 Java/Spring",
+      "SQL",
+      "데이터베이스 설계",
+      "인증/인가",
+      "Git 협업",
+      "배포와 로그 확인",
+      "테스트 코드 작성"
+    ];
+  }
+
+  if (/(frontend|프론트엔드|ui|ux)/i.test(value)) {
+    return [
+      "HTML/CSS",
+      "JavaScript",
+      "반응형 UI",
+      "접근성 기초",
+      "브라우저 디버깅",
+      "API 연동",
+      "상태 관리",
+      "사용자 흐름 설계"
+    ];
+  }
+
+  return [
+    "문제 해결력",
+    "Git 협업",
+    "기초 프로그래밍",
+    "데이터 이해",
+    "문서화 역량",
+    "포트폴리오 프로젝트 경험",
+    "면접 답변 정리",
+    "목표 산업 이해"
+  ];
+}
+
 function normalizeRoles(parsed, company) {
   const roles = Array.isArray(parsed.roles) ? parsed.roles : [];
   const cleanRoles = roles
@@ -284,6 +354,16 @@ function normalizeRoles(parsed, company) {
   }
 
   return cleanRoles;
+}
+
+function normalizeSkills(parsed, company, jobRole) {
+  const skills = Array.isArray(parsed.skills) ? parsed.skills : [];
+  const cleanSkills = skills
+    .map((skill) => String(skill || "").trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  return cleanSkills.length > 0 ? cleanSkills : getFallbackSkills(company, jobRole);
 }
 
 async function generateRoleSuggestions(company) {
@@ -343,6 +423,64 @@ async function generateRoleSuggestions(company) {
   return normalizeRoles(parsed, company);
 }
 
+async function generateSkillSuggestions(company, jobRole) {
+  if (!geminiApiKey) {
+    return getFallbackSkills(company, jobRole);
+  }
+
+  const prompt = `
+목표 기업: ${company}
+희망 직무: ${jobRole}
+
+이 기업과 직무를 준비하는 사람이 현재 보유 여부를 체크해볼 만한 핵심 역량/기술을 한국어로 추천해줘.
+너무 추상적인 태도보다 체크박스로 고를 수 있는 구체적인 기술, 도메인 지식, 업무 역량을 우선해줘.
+실시간 채용 공고처럼 단정하지 말고, 기업과 산업 특성을 바탕으로 가능성 높은 역량을 추천해줘.
+
+반드시 아래 JSON만 반환해줘.
+{
+  "skills": ["역량 1", "역량 2", "역량 3"]
+}
+`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [
+            {
+              text:
+                "너는 기업, 산업, 직무를 바탕으로 취업 준비자가 보유 역량을 점검할 체크리스트를 만드는 커리어 리서처야."
+            }
+          ]
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.35,
+          responseMimeType: "application/json"
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 429 || response.status === 503) {
+      return getFallbackSkills(company, jobRole);
+    }
+
+    const detail = await response.text();
+    throw new Error(`Gemini API 오류: ${detail}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  const parsed = parseGeminiJson(content);
+
+  return normalizeSkills(parsed, company, jobRole);
+}
+
 async function generateWithGemini(input) {
   if (!geminiApiKey) {
     return getFallbackRoadmap(input);
@@ -353,8 +491,10 @@ async function generateWithGemini(input) {
 
 목표 기업: ${input.company}
 희망 직무: ${input.jobRole}
-현재 보유 기술/역량: ${input.skills}
+현재 보유 기술/역량: ${input.skills || "입력하지 않음"}
 경력 수준: ${input.level}
+
+현재 보유 기술/역량이 비어 있으면, 해당 직무를 처음 준비하는 사람으로 보고 기초 점검부터 시작하는 로드맵을 만들어줘.
 
 반드시 다음 JSON 구조를 지켜줘.
 {
@@ -434,7 +574,7 @@ app.post("/api/generate-roadmap", async (req, res) => {
     const input = {
       company: req.body.company.trim(),
       jobRole: req.body.jobRole.trim(),
-      skills: req.body.skills.trim(),
+      skills: String(req.body.skills || "").trim(),
       level: req.body.level.trim()
     };
     const roadmap = await generateWithGemini(input);
@@ -466,6 +606,25 @@ app.post("/api/suggest-roles", async (req, res) => {
   }
 });
 
+app.post("/api/suggest-skills", async (req, res) => {
+  const company = String(req.body.company || "").trim();
+  const jobRole = String(req.body.jobRole || "").trim();
+
+  if (!company || !jobRole) {
+    return res.status(400).json({ message: "목표 기업과 희망 직무를 먼저 입력해주세요." });
+  }
+
+  try {
+    const skills = await generateSkillSuggestions(company, jobRole);
+    return res.json({ skills });
+  } catch (err) {
+    return res.status(500).json({
+      message: "추천 역량을 불러오는 중 오류가 발생했습니다.",
+      detail: err.message
+    });
+  }
+});
+
 app.post("/api/save-roadmap", requireAuth, async (req, res) => {
   const { company, jobRole, skills, level, roadmap, progress = 0 } = req.body;
   const error = validateGoalInput({ company, jobRole, skills, level });
@@ -480,7 +639,7 @@ app.post("/api/save-roadmap", requireAuth, async (req, res) => {
       user_id: req.user.id,
       company,
       job_role: jobRole,
-      skills,
+      skills: String(skills || ""),
       level,
       roadmap_result: roadmap,
       progress

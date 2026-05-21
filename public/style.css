@@ -201,8 +201,8 @@ textarea {
 }
 
 #skills {
-  min-height: 132px;
-  max-height: 132px;
+  min-height: auto;
+  max-height: none;
 }
 
 #firstAction {
@@ -252,6 +252,43 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.skill-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.skill-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.skill-check input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--blue);
+}
+
+.skill-check span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.skill-check:has(input:checked) {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-soft);
 }
 
 .role-chip {
@@ -571,10 +608,42 @@ ol {
 
 .check-item {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   gap: 14px;
   align-items: start;
   padding: 18px;
+}
+
+.check-item.dragging {
+  opacity: 0.55;
+}
+
+.check-item.drag-over {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff;
+  cursor: grab;
+  line-height: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:focus-visible {
+  border-color: var(--blue);
+  outline: 3px solid rgba(37, 99, 235, 0.16);
 }
 
 .check-item.done {
@@ -671,16 +740,17 @@ ol {
   }
 
   .level-options,
-  .button-row {
+  .button-row,
+  .skill-suggestions {
     grid-template-columns: 1fr;
   }
 
   .check-item {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto auto 1fr;
   }
 
   .check-meta {
-    grid-column: 2;
+    grid-column: 3;
     justify-items: start;
   }
 }

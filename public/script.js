@@ -28,11 +28,15 @@ const regenerateButton = document.querySelector("#regenerateButton");
 const saveButton = document.querySelector("#saveButton");
 const startProgressButton = document.querySelector("#startProgressButton");
 const suggestRolesButton = document.querySelector("#suggestRolesButton");
+const suggestSkillsButton = document.querySelector("#suggestSkillsButton");
 const loadingBox = document.querySelector("#loadingBox");
 const roadmapContent = document.querySelector("#roadmapContent");
 const saveStatus = document.querySelector("#saveStatus");
 const roleHint = document.querySelector("#roleHint");
 const roleSuggestions = document.querySelector("#roleSuggestions");
+const skillHint = document.querySelector("#skillHint");
+const skillSuggestions = document.querySelector("#skillSuggestions");
+let draggedChecklistIndex = null;
 
 const fields = {
   company: document.querySelector("#company"),
@@ -57,13 +61,26 @@ function getSelectedLevel() {
   return document.querySelector('input[name="level"]:checked')?.value || "";
 }
 
+function getSelectedSkills() {
+  const checkedSkills = Array.from(
+    document.querySelectorAll('input[name="suggestedSkill"]:checked')
+  ).map((input) => input.value);
+  const customSkills = fields.skills.value
+    .split(/[,，\n]/)
+    .map((skill) => skill.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set([...checkedSkills, ...customSkills]));
+}
+
 function collectGoal() {
   const customJobRole = fields.customJobRole.value.trim();
+  const selectedSkills = getSelectedSkills();
 
   return {
     company: fields.company.value.trim(),
     jobRole: customJobRole || fields.jobRole.value.trim(),
-    skills: fields.skills.value.trim(),
+    skills: selectedSkills.join(", "),
     level: getSelectedLevel()
   };
 }
@@ -81,7 +98,7 @@ function validateGoal(showErrors = false) {
   const errors = {
     company: goal.company ? "" : "목표 기업을 입력해주세요.",
     jobRole: goal.jobRole ? "" : "희망 직무를 선택해주세요.",
-    skills: goal.skills ? "" : "현재 보유 기술/역량을 입력해주세요.",
+    skills: "",
     level: goal.level ? "" : "경력 수준을 선택해주세요."
   };
 
@@ -151,6 +168,26 @@ function renderRoleSuggestions(roles) {
   });
 }
 
+function renderSkillSuggestions(skills) {
+  skillSuggestions.innerHTML = "";
+
+  skills.forEach((skill) => {
+    const label = document.createElement("label");
+    label.className = "skill-check";
+    const input = document.createElement("input");
+    const text = document.createElement("span");
+
+    input.type = "checkbox";
+    input.name = "suggestedSkill";
+    input.value = skill;
+    text.textContent = skill;
+    input.addEventListener("change", () => validateGoal(false));
+
+    label.append(input, text);
+    skillSuggestions.appendChild(label);
+  });
+}
+
 async function suggestRoles() {
   const company = fields.company.value.trim();
 
@@ -186,6 +223,45 @@ async function suggestRoles() {
     roleHint.textContent = error.message;
   } finally {
     suggestRolesButton.disabled = false;
+  }
+}
+
+async function suggestSkills() {
+  const goal = collectGoal();
+
+  if (!goal.company || !goal.jobRole) {
+    skillHint.textContent = "목표 기업과 희망 직무를 먼저 입력해주세요.";
+    return;
+  }
+
+  suggestSkillsButton.disabled = true;
+  skillHint.textContent = "기업과 직무에 필요한 역량을 찾는 중입니다...";
+
+  try {
+    const response = await fetch("/api/suggest-skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company: goal.company,
+        jobRole: goal.jobRole
+      })
+    });
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+      ? await response.json()
+      : { message: "서버가 최신 상태가 아닙니다. 개발 서버를 다시 시작해주세요." };
+
+    if (!response.ok) {
+      throw new Error(data.message || "추천 역량을 불러오지 못했습니다.");
+    }
+
+    renderSkillSuggestions(data.skills || []);
+    skillHint.textContent = "현재 보유한 역량을 체크하거나 직접 입력하세요. 비워도 분석은 가능합니다.";
+    validateGoal(false);
+  } catch (error) {
+    skillHint.textContent = error.message;
+  } finally {
+    suggestSkillsButton.disabled = false;
   }
 }
 
@@ -512,7 +588,12 @@ function loadRoadmapFromRecord(record) {
     fields.jobRole.value = "";
     fields.customJobRole.value = state.goal.jobRole;
   }
-  fields.skills.value = state.goal.skills;
+  fields.skills.value = state.goal.skills || "";
+  skillSuggestions.innerHTML = "";
+  skillHint.textContent =
+    state.goal.skills
+      ? "저장된 보유 역량을 직접 입력칸에 불러왔습니다."
+      : "저장된 보유 역량이 없습니다. 필요하면 역량 찾기를 다시 사용할 수 있습니다.";
   document.querySelectorAll('input[name="level"]').forEach((input) => {
     input.checked = input.value === state.goal.level;
   });
@@ -557,7 +638,15 @@ function renderProgress() {
   checklist.forEach((item, index) => {
     const row = document.createElement("article");
     row.className = `check-item ${item.done ? "done" : ""}`;
+    row.dataset.index = String(index);
     row.innerHTML = `
+      <button
+        class="drag-handle"
+        type="button"
+        draggable="true"
+        aria-label="${item.title} 우선순위 변경"
+        title="드래그해서 우선순위 변경"
+      >☰</button>
       <input type="checkbox" ${item.done ? "checked" : ""} aria-label="${item.title} 완료" />
       <div>
         <h3>${item.title}</h3>
@@ -569,6 +658,51 @@ function renderProgress() {
         <span class="${item.done ? "status-done" : ""}">${item.done ? "완료" : "진행 중"}</span>
       </div>
     `;
+
+    const dragHandle = row.querySelector(".drag-handle");
+    dragHandle.addEventListener("dragstart", (event) => {
+      draggedChecklistIndex = index;
+      row.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(index));
+    });
+
+    dragHandle.addEventListener("dragend", () => {
+      draggedChecklistIndex = null;
+      row.classList.remove("dragging");
+    });
+
+    row.addEventListener("dragover", (event) => {
+      if (draggedChecklistIndex === null || draggedChecklistIndex === index) {
+        return;
+      }
+
+      event.preventDefault();
+      row.classList.add("drag-over");
+      event.dataTransfer.dropEffect = "move";
+    });
+
+    row.addEventListener("dragleave", () => {
+      row.classList.remove("drag-over");
+    });
+
+    row.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      row.classList.remove("drag-over");
+
+      const fromIndex = Number(event.dataTransfer.getData("text/plain"));
+      const toIndex = index;
+
+      if (!Number.isInteger(fromIndex) || fromIndex === toIndex) {
+        return;
+      }
+
+      const [movedItem] = checklist.splice(fromIndex, 1);
+      checklist.splice(toIndex, 0, movedItem);
+      draggedChecklistIndex = null;
+      renderProgress();
+      await persistProgress();
+    });
 
     row.querySelector("input").addEventListener("change", async (event) => {
       item.done = event.target.checked;
@@ -625,6 +759,7 @@ fields.customJobRole.addEventListener("input", () => {
     );
   }
 });
+suggestSkillsButton.addEventListener("click", suggestSkills);
 suggestRolesButton.addEventListener("click", suggestRoles);
 
 goalForm.addEventListener("submit", async (event) => {
