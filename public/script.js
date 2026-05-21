@@ -65,6 +65,14 @@ function showPanel(name) {
   stepButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.stepButton === name);
   });
+
+  // 새롭게 활성화된 패널로 포커스를 이동하여 Tab 키 누름 시 포커스가 헤더 네비게이션으로 초기화되는 현상 방지
+  const activePanel = panels[name];
+  if (activePanel) {
+    activePanel.setAttribute("tabindex", "-1");
+    activePanel.style.outline = "none";
+    activePanel.focus();
+  }
 }
 
 function getSelectedLevel() {
