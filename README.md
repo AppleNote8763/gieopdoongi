@@ -91,10 +91,12 @@ SUPABASE_SERVICE_ROLE_KEY
 
 ## Supabase Database 설정
 
-SQL Editor에서 아래 SQL을 실행합니다.
+직접 생성해야 하는 테이블은 `public.roadmaps` 하나입니다. `auth.users`는 Supabase Authentication이 자동으로 관리하므로 직접 만들지 않습니다.
+
+SQL Editor에서 아래 SQL을 실행합니다. 같은 SQL은 [supabase/schema.sql](</c:/Users/user/Desktop/RoadUp AI/supabase/schema.sql>)에도 들어 있습니다.
 
 ```sql
-create table roadmaps (
+create table if not exists public.roadmaps (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   company text not null,
@@ -102,15 +104,22 @@ create table roadmaps (
   skills text not null,
   level text not null,
   roadmap_result jsonb not null,
-  progress integer not null default 0,
+  progress integer not null default 0 check (progress >= 0 and progress <= 100),
   created_at timestamptz not null default now()
 );
 
-create index roadmaps_user_id_created_at_idx
-on roadmaps (user_id, created_at desc);
+create index if not exists roadmaps_user_id_created_at_idx
+on public.roadmaps (user_id, created_at desc);
 ```
 
 이 프로젝트는 Express 서버에서 service role key로 사용자 토큰을 검증한 뒤 `user_id` 조건을 걸어 조회/수정합니다. 그래서 클라이언트가 Supabase Database를 직접 호출하지 않습니다.
+
+현재 필요 없는 테이블:
+
+- `profiles`
+- `users`
+- `checklists`
+- `progress_logs`
 
 ## 로그인 사용자 정책
 
