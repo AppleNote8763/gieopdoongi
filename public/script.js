@@ -164,7 +164,10 @@ async function suggestRoles() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ company })
     });
-    const data = await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+      ? await response.json()
+      : { message: "서버가 최신 상태가 아닙니다. 개발 서버를 다시 시작해주세요." };
 
     if (!response.ok) {
       throw new Error(data.message || "추천 직무를 불러오지 못했습니다.");
