@@ -778,14 +778,19 @@ textarea {
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--shadow-sm);
 }
 
 .roadmap-block h3 {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
   color: var(--ink);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 800;
+  letter-spacing: 0.1px;
+  text-transform: uppercase;
 }
 
 .roadmap-block p {
@@ -932,24 +937,27 @@ ol li {
 }
 
 .d-day-banner {
-  padding: 20px;
+  padding: 18px 20px;
   border-radius: var(--radius-sm);
   color: var(--primary);
-  background: var(--primary-soft);
+  background: linear-gradient(135deg, var(--primary-soft) 0%, hsl(var(--primary-h), var(--primary-s), 93%) 100%);
   text-align: center;
+  border: 1px solid hsl(var(--primary-h), var(--primary-s), 88%);
 }
 
 .d-day-banner h3 {
-  margin: 0 0 4px;
-  font-size: 28px;
+  margin: 0 0 3px;
+  font-size: 26px;
   font-weight: 900;
+  letter-spacing: -0.5px;
 }
 
 .d-day-banner p {
   margin: 0;
   color: inherit;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .dashboard-progress-group {
@@ -964,8 +972,10 @@ ol li {
 
 .compact-card {
   margin-top: 0;
-  padding: 16px;
+  padding: 14px 16px;
   background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
 }
 
 .progress-card-head {
@@ -973,13 +983,15 @@ ol li {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .progress-card-head span {
-  color: var(--ink);
-  font-size: 13px;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
 }
 
 .progress-card strong {
@@ -993,8 +1005,8 @@ ol li {
 
 .compact-card strong {
   margin: 0;
-  font-size: 18px;
-  letter-spacing: 0;
+  font-size: 20px;
+  letter-spacing: -0.5px;
 }
 
 .progress-card p {
@@ -1020,28 +1032,32 @@ ol li {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: #ffffff;
+  box-shadow: var(--shadow-sm);
 }
 
 .mini-panel-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
 }
 
 .mini-panel h3,
 .mini-panel-head h3 {
   margin: 0;
   color: var(--ink);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
+  letter-spacing: -0.1px;
 }
 
 .mini-panel-head span {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .job-posting-list {
@@ -1193,12 +1209,17 @@ ol li {
   grid-template-columns: auto auto 1fr auto;
   gap: 16px;
   align-items: start;
-  padding: 16px 20px;
+  padding: 14px 18px;
   background: #ffffff;
   border: 1px solid var(--line);
+  border-left: 3px solid transparent;
   position: relative;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.check-item:not(.done) {
+  border-left-color: var(--primary);
 }
 
 .check-item > div:nth-child(3) {
@@ -1254,13 +1275,14 @@ ol li {
 
 .check-item.done {
   border-color: var(--green-border, #a7f3d0);
+  border-left-color: var(--green);
   background: var(--green-soft, #f0fdf4);
 }
 
 .check-item.done h3 {
   text-decoration: line-through;
-  color: #64748b;
-  opacity: 0.8;
+  color: #94a3b8;
+  opacity: 1;
 }
 
 .check-item > input[type="checkbox"] {
@@ -1291,7 +1313,7 @@ ol li {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 5px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -1299,8 +1321,9 @@ ol li {
 
 .check-meta span {
   background: #f1f5f9;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 4px;
+  white-space: nowrap;
 }
 
 .duration-edit {
@@ -1338,7 +1361,9 @@ ol li {
 .check-meta .priority-badge {
   background: var(--primary-soft);
   color: var(--primary);
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: 0.2px;
 }
 
 .check-meta span.status-done {
