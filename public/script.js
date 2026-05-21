@@ -1137,13 +1137,23 @@ function renderProgress() {
   const checklistBox = document.querySelector("#checklist");
   checklistBox.innerHTML = "";
 
-  function cleanTitle(title) {
-    // 옛 코드로 저장된 " ..." / "..." 말줄임 제거
-    return String(title || "").replace(/\s*\.\.\.\s*$/, "").trim();
+  function cleanTitle(title, description) {
+    const t = String(title || "").trim();
+    if (!t.endsWith("...")) return t;
+
+    // 옛 코드: title = "[주차제목] - [첫15글자]...", description = 전체 원문
+    // description으로 제목 전체를 복원한다
+    const dashIdx = t.lastIndexOf(" - ");
+    if (dashIdx !== -1 && description) {
+      const weekTitle = t.slice(0, dashIdx);
+      return `${weekTitle} - ${description}`;
+    }
+    // fallback: ... 만 제거
+    return t.replace(/\s*\.\.\.\s*$/, "").trim();
   }
 
   checklist.forEach((item, index) => {
-    const displayTitle = cleanTitle(item.title);
+    const displayTitle = cleanTitle(item.title, item.description);
     const row = document.createElement("article");
     row.className = `check-item ${item.done ? "done" : ""}`;
     row.dataset.index = String(index);
