@@ -1201,6 +1201,10 @@ ol li {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.check-item > div:nth-child(3) {
+  min-width: 0;
+}
+
 .check-item.dragging {
   opacity: 0.4;
   border: 1px dashed var(--primary);
@@ -1271,6 +1275,9 @@ ol li {
   font-size: 14.5px;
   font-weight: 700;
   margin-bottom: 4px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .check-item p {
