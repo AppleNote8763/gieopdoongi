@@ -1,5 +1,72 @@
 # 기업뚱이 인수인계
 
+## 최신 작업 메모
+
+- 저장소: `https://github.com/AppleNote8763/gieopdoongi.git`
+- 배포: Vercel, `main` 브랜치 자동 배포
+- 앱 표시명: 기업뚱이
+- 최신 원격 커밋: `bc55b72 Fix goal validation skill selection bug`
+- 현재 로컬에는 아직 커밋/push하지 않은 변경이 있음.
+
+### 최근 반영 완료 및 push된 작업
+
+- 고용24/워크넷 채용정보 OpenAPI 연동 구조 추가
+- 앱 표시명 `기업둥이` -> `기업뚱이` 변경
+- 로그인/회원가입 헤더 버튼 크기 정렬
+- `selectedSkills is not defined` 버그 수정
+  - 원인: `collectGoal()`에서 `selectedSkills`를 선언하지 않고 사용
+  - 영향: 직무 선택 후 버튼 활성화, 역량 찾기, AI 분석 버튼 검증이 막힘
+
+### 아직 push하지 않은 로컬 변경
+
+- `public/script.js`
+  - 진행 관리 > 로드맵 다시 최적화 > 새로운 준비 기간에서 `달력에서 목표일 선택` 선택 시 날짜 입력칸이 표시되도록 수정
+  - 브라우저가 지원하면 `input[type="date"]`의 `showPicker()`를 호출해 달력 picker를 바로 열도록 개선
+- `server.js`
+  - `/api/suggest-roles`, `/api/suggest-skills` Gemini 호출에 15초 timeout 추가
+  - timeout 시 fallback 직무/역량 추천을 반환하도록 개선
+  - 이유: 로컬 테스트 중 `/api/suggest-skills`가 Gemini 응답 지연으로 timeout되는 문제 발견
+
+사용자가 "할 거 다 하고 깃에 푸시하자"고 했으므로, 추가 요청을 더 반영한 뒤 마지막에 한 번에 commit/push하는 것이 현재 진행 방향이다.
+
+### 최근 로컬 테스트 결과
+
+- `node --check server.js` 통과
+- `node --check public/script.js` 통과
+- `package.json` 파싱 통과
+- 로컬 서버 기동 후 확인:
+  - `/` -> 200
+  - `/api/config` -> 200
+  - `/api/suggest-roles` -> 200
+  - `/api/suggest-skills` -> 200
+  - `/api/job-postings` -> 200
+  - `/api/generate-roadmap` -> 200
+  - 비로그인 `/api/save-roadmap` -> 401 정상
+  - 비로그인 `/api/roadmaps` -> 401 정상
+
+### 고용24 API 키
+
+- 서버에서만 호출하도록 구현됨.
+- `.env`에 아래 키 필요:
+
+```env
+WORK24_API_KEY=발급받은키
+```
+
+- 예전 명칭 호환으로 `WORKNET_API_KEY`도 읽음.
+- Vercel에도 Environment Variable `WORK24_API_KEY` 추가 필요.
+- 키가 없으면 앱은 죽지 않고 채용공고 목록만 비어 있음.
+
+### Vercel 경고 참고
+
+Vercel 로그의 아래 메시지는 현재 치명적인 오류가 아니라 경고다.
+
+```txt
+WARNING! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply.
+```
+
+`vercel.json`에 `builds`가 있어서 Vercel 대시보드의 Build Command/Output Directory 설정이 무시된다는 의미이며, 스크린샷 기준 배포 상태는 `Ready`였다.
+
 ## 프로젝트 개요
 
 - 프로젝트명: 기업뚱이

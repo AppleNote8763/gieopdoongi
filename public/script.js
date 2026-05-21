@@ -1275,11 +1275,46 @@ const newTargetPeriod = document.querySelector("#newTargetPeriod");
 const newCustomTargetPeriod = document.querySelector("#newCustomTargetPeriod");
 const submitRecalcBtn = document.querySelector("#submitRecalcBtn");
 const cancelRecalcBtn = document.querySelector("#cancelRecalcBtn");
+const newTargetDateLabel = document.querySelector("#newTargetDateLabel");
+const newTargetDateInput = document.querySelector("#newTargetDateInput");
+const customNewTargetPeriodLabel = document.querySelector("#customNewTargetPeriodLabel");
 
 if (recalcPeriodButton) {
+  function syncRecalcPeriodInputs({ openPicker = false } = {}) {
+    if (!customNewTargetPeriodLabel || !newTargetDateLabel || !newTargetDateInput) {
+      return;
+    }
+
+    customNewTargetPeriodLabel.classList.add("hidden");
+    newTargetDateLabel.classList.add("hidden");
+
+    if (newTargetPeriod.value === "custom") {
+      customNewTargetPeriodLabel.classList.remove("hidden");
+      if (openPicker) {
+        newCustomTargetPeriod.focus();
+      }
+      return;
+    }
+
+    if (newTargetPeriod.value === "date") {
+      newTargetDateLabel.classList.remove("hidden");
+      if (openPicker) {
+        newTargetDateInput.focus();
+        if (typeof newTargetDateInput.showPicker === "function") {
+          try {
+            newTargetDateInput.showPicker();
+          } catch (_error) {
+            // Some browsers only allow the picker from direct pointer/keyboard activation.
+          }
+        }
+      }
+    }
+  }
+
   recalcPeriodButton.addEventListener("click", () => {
     recalcPeriodForm.classList.remove("hidden");
     recalcPeriodButton.parentElement.classList.add("hidden");
+    syncRecalcPeriodInputs();
   });
 
   cancelRecalcBtn.addEventListener("click", () => {
@@ -1287,23 +1322,10 @@ if (recalcPeriodButton) {
     recalcPeriodButton.parentElement.classList.remove("hidden");
   });
 
-  const newTargetDateLabel = document.querySelector("#newTargetDateLabel");
-  const newTargetDateInput = document.querySelector("#newTargetDateInput");
-  const customNewTargetPeriodLabel = document.querySelector("#customNewTargetPeriodLabel");
-
   newTargetPeriod.addEventListener("change", () => {
-    customNewTargetPeriodLabel.classList.add("hidden");
-    newTargetDateLabel.classList.add("hidden");
     newCustomTargetPeriod.value = "";
     newTargetDateInput.value = "";
-    
-    if (newTargetPeriod.value === "custom") {
-      customNewTargetPeriodLabel.classList.remove("hidden");
-      newCustomTargetPeriod.focus();
-    } else if (newTargetPeriod.value === "date") {
-      newTargetDateLabel.classList.remove("hidden");
-      newTargetDateInput.focus();
-    }
+    syncRecalcPeriodInputs({ openPicker: true });
   });
 
   submitRecalcBtn.addEventListener("click", async () => {

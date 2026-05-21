@@ -709,28 +709,37 @@ async function generateRoleSuggestions(company) {
 }
 `;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text:
-                "너는 기업과 산업을 분석해 취업 가능한 직군을 추천하는 커리어 리서처야."
-            }
-          ]
-        },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.35,
-          responseMimeType: "application/json"
-        }
-      })
+  let response;
+  try {
+    response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text:
+                  "너는 기업과 산업을 분석해 취업 가능한 직군을 추천하는 커리어 리서처야."
+              }
+            ]
+          },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.35,
+            responseMimeType: "application/json"
+          }
+        })
+      },
+      15000
+    );
+  } catch (error) {
+    if (error.name === "AbortError" || error.code === "UND_ERR_CONNECT_TIMEOUT") {
+      return getFallbackRoles(company);
     }
-  );
+    throw error;
+  }
 
   if (!response.ok) {
     if (response.status === 429 || response.status === 503) {
@@ -767,28 +776,37 @@ async function generateSkillSuggestions(company, jobRole) {
 }
 `;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text:
-                "너는 기업, 산업, 직무를 바탕으로 취업 준비자가 보유 역량을 점검할 체크리스트를 만드는 커리어 리서처야."
-            }
-          ]
-        },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.35,
-          responseMimeType: "application/json"
-        }
-      })
+  let response;
+  try {
+    response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text:
+                  "너는 기업, 산업, 직무를 바탕으로 취업 준비자가 보유 역량을 점검할 체크리스트를 만드는 커리어 리서처야."
+              }
+            ]
+          },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.35,
+            responseMimeType: "application/json"
+          }
+        })
+      },
+      15000
+    );
+  } catch (error) {
+    if (error.name === "AbortError" || error.code === "UND_ERR_CONNECT_TIMEOUT") {
+      return getFallbackSkills(company, jobRole);
     }
-  );
+    throw error;
+  }
 
   if (!response.ok) {
     if (response.status === 429 || response.status === 503) {
