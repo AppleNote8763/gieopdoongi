@@ -88,6 +88,16 @@ function on(element, eventName, handler) {
   }
 }
 
+function setElementHidden(element, isHidden) {
+  if (!element) {
+    return;
+  }
+
+  element.hidden = isHidden;
+  element.classList.toggle("hidden", isHidden);
+  element.style.display = isHidden ? "none" : "";
+}
+
 const fields = {
   company: document.querySelector("#company"),
   jobRole: document.querySelector("#jobRole"),
@@ -1468,11 +1478,11 @@ if (recalcPeriodButton) {
       return;
     }
 
-    customNewTargetPeriodLabel.classList.add("hidden");
-    newTargetDateLabel.classList.add("hidden");
+    setElementHidden(customNewTargetPeriodLabel, true);
+    setElementHidden(newTargetDateLabel, true);
 
     if (newTargetPeriod.value === "custom") {
-      customNewTargetPeriodLabel.classList.remove("hidden");
+      setElementHidden(customNewTargetPeriodLabel, false);
       if (openPicker) {
         newCustomTargetPeriod.focus();
       }
@@ -1480,7 +1490,7 @@ if (recalcPeriodButton) {
     }
 
     if (newTargetPeriod.value === "date") {
-      newTargetDateLabel.classList.remove("hidden");
+      setElementHidden(newTargetDateLabel, false);
       if (!newTargetStartDateInput.value) {
         newTargetStartDateInput.value = todayDateValue();
       }
@@ -1493,12 +1503,14 @@ if (recalcPeriodButton) {
 
   recalcPeriodButton.addEventListener("click", () => {
     recalcPeriodForm.classList.remove("hidden");
+    recalcPeriodForm.hidden = false;
     recalcPeriodButton.parentElement.classList.add("hidden");
     syncRecalcPeriodInputs();
   });
 
   cancelRecalcBtn.addEventListener("click", () => {
     recalcPeriodForm.classList.add("hidden");
+    recalcPeriodForm.hidden = true;
     recalcPeriodButton.parentElement.classList.remove("hidden");
   });
 
@@ -1507,6 +1519,10 @@ if (recalcPeriodButton) {
     newTargetStartDateInput.value = "";
     newTargetEndDateInput.value = "";
     syncRecalcPeriodInputs({ openPicker: true });
+  });
+
+  newTargetPeriod.addEventListener("input", () => {
+    syncRecalcPeriodInputs({ openPicker: false });
   });
 
   newTargetStartDateInput.addEventListener("input", () => {

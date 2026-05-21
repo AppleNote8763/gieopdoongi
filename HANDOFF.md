@@ -5,8 +5,35 @@
 - 저장소: `https://github.com/AppleNote8763/gieopdoongi.git`
 - 배포: Vercel, `main` 브랜치 자동 배포
 - 앱 표시명: 기업뚱이
-- 최신 원격 커밋: `bc55b72 Fix goal validation skill selection bug`
-- 현재 로컬에는 아직 커밋/push하지 않은 변경이 있음.
+- 최신 원격 커밋: `Fix recalc date selector visibility` (`git log --oneline -1`로 해시 확인)
+- 현재 로컬 변경은 위 커밋에 포함되어 push 완료된 상태가 기준이다.
+
+### 최신 작업 요약 (2026-05-21)
+
+- 커밋/push 완료:
+  - `493ce52 Improve roadmap date and checklist editing`
+  - 반영 내용:
+    - 이전 데이터 카드 클릭 시 진행 관리 페이지로 이동하지 않던 문제 수정
+    - 목표 설정과 진행 관리 재조정 폼에서 날짜를 `시작 날짜` + `목표 날짜`로 선택하도록 변경
+    - AI 분석 시작 버튼이 준비 기간 에러 표시 요소 누락 때문에 submit 중단되던 문제 수정
+    - 진행 관리 체크리스트의 예상 기간을 직접 수정 가능하게 변경
+    - 체크리스트 기본 기간이 `3-5일`로 고정 반복되지 않도록 전체 기간/항목 수 기준으로 분산
+    - Gemini 프롬프트에 체크리스트 duration을 난이도별로 다르게 산정하도록 보강
+- 최신 커밋에 포함된 추가 변경:
+  - 진행 관리 > 로드맵 다시 최적화 > `달력에서 목표일 선택` 선택 시 달력 기간 선택 영역이 확실히 보이도록 수정
+  - `hidden` class뿐 아니라 `hidden` 속성, `display`까지 함께 동기화하는 `setElementHidden()` 추가
+  - 재조정 폼의 `직접 입력`/`기간 선택` 영역을 중첩 `label` 구조에서 `div.field` 구조로 정리
+- 더미 테스트 계정 생성 완료:
+  - 이메일: `111@111.com`
+  - 비밀번호: `123123`
+  - Supabase Auth Admin API로 `email_confirm: true` 상태 생성
+- 로컬 서버:
+  - `npm run dev`로 실행 확인
+  - 접속 URL: `http://127.0.0.1:3000/`
+  - `/` 응답 200 확인
+- 사용자 Git 운영 선호:
+  - 사용자가 명시적으로 "깃에 올려줘", "푸시해줘", "커밋/푸시해줘"라고 요청할 때만 GitHub에 올린다.
+  - 자동 커밋/푸시는 하지 않는다.
 
 ### 최근 반영 완료 및 push된 작업
 
@@ -17,7 +44,7 @@
   - 원인: `collectGoal()`에서 `selectedSkills`를 선언하지 않고 사용
   - 영향: 직무 선택 후 버튼 활성화, 역량 찾기, AI 분석 버튼 검증이 막힘
 
-### 아직 push하지 않은 로컬 변경
+### 이전에 기록된 로컬 변경 참고
 
 - `public/script.js`
   - 진행 관리 > 로드맵 다시 최적화 > 새로운 준비 기간에서 `달력에서 목표일 선택` 선택 시 날짜 입력칸이 표시되도록 수정
@@ -27,7 +54,7 @@
   - timeout 시 fallback 직무/역량 추천을 반환하도록 개선
   - 이유: 로컬 테스트 중 `/api/suggest-skills`가 Gemini 응답 지연으로 timeout되는 문제 발견
 
-사용자가 "할 거 다 하고 깃에 푸시하자"고 했으므로, 추가 요청을 더 반영한 뒤 마지막에 한 번에 commit/push하는 것이 현재 진행 방향이다.
+위 항목 대부분은 `493ce52`까지 반영 및 push 완료됨. 이후 달력 표시 보완과 이 인수인계 갱신은 `Fix recalc date selector visibility` 커밋에 포함됨.
 
 ### 최근 로컬 테스트 결과
 
