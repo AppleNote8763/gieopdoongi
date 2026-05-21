@@ -1,4 +1,4 @@
-# 기업둥이
+# 기업뚱이
 
 AI 취업 준비 플래너 웹 서비스입니다. 사용자가 목표 기업, 희망 직무, 현재 보유 기술/역량, 경력 수준을 입력하면 Gemini API가 맞춤형 4주 취업 준비 로드맵을 생성합니다. Supabase Authentication으로 로그인한 사용자만 로드맵과 진행률을 사용자별로 저장하고 다시 불러올 수 있습니다.
 
@@ -186,7 +186,7 @@ on public.roadmaps (user_id, created_at desc);
 ```bash
 git init
 git add .
-git commit -m "Initial 기업둥이 project"
+git commit -m "Initial 기업뚱이 project"
 git remote add origin https://github.com/your-name/gieopdoongi.git
 git branch -M main
 git push -u origin main

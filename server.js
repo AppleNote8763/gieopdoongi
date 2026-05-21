@@ -1106,7 +1106,7 @@ app.get("*", (req, res) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`기업둥이 server is running on http://localhost:${PORT}`);
+    console.log(`기업뚱이 server is running on http://localhost:${PORT}`);
   });
 }
 

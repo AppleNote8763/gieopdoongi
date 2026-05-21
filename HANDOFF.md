@@ -1,8 +1,8 @@
-# 기업둥이 인수인계
+# 기업뚱이 인수인계
 
 ## 프로젝트 개요
 
-- 프로젝트명: 기업둥이
+- 프로젝트명: 기업뚱이
 - 저장소: `https://github.com/AppleNote8763/gieopdoongi.git`
 - 로컬 경로: `C:\Users\user\Desktop\RoadUp AI`
 - 실행 방식: Node.js + Express 서버가 `public` 정적 파일을 서빙
@@ -88,7 +88,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 ## Supabase 상태
 
-Supabase 프로젝트명: 기업둥이
+Supabase 프로젝트명: 기업뚱이
 
 직접 만든 DB 테이블은 하나:
 

@@ -1,7 +1,7 @@
 {
   "name": "gieopdoongi",
   "version": "1.0.0",
-  "description": "기업둥이 AI 취업 준비 플래너 웹 서비스",
+  "description": "기업뚱이 AI 취업 준비 플래너 웹 서비스",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
