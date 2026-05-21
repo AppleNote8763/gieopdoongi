@@ -148,7 +148,8 @@ function collectGoal() {
   const targetPeriod = fields.targetPeriod.value;
   const customTargetPeriod = fields.customTargetPeriod.value.trim();
   const targetDateInput = fields.targetDateInput.value;
-
+  const selectedSkills = getSelectedSkills();
+  
   let finalTargetPeriod = targetPeriod;
   if (targetPeriod === "custom") {
     finalTargetPeriod = customTargetPeriod;
