@@ -555,7 +555,7 @@ function updateProgressHint() {
     return;
   }
 
-  hint.textContent = "체크 상태가 변경될 때마다 Supabase에 진행률이 저장됩니다.";
+  hint.textContent = "";
 }
 
 function renderTargetSummary() {
@@ -618,7 +618,8 @@ function renderJobPostings() {
   list.innerHTML = "";
 
   if (postings.length === 0) {
-    hint.textContent = "WORK24_API_KEY를 설정하면 목표 기업/직무 기준 최신 공고가 표시됩니다.";
+    hint.textContent = "채용공고를 불러오는 중입니다...";
+    fetchAndRenderJobPostings();
     return;
   }
 
@@ -649,6 +650,68 @@ function renderJobPostings() {
     `;
     list.appendChild(item);
   });
+}
+
+async function fetchAndRenderJobPostings() {
+  const list = document.querySelector("#jobPostingList");
+  const hint = document.querySelector("#jobPostingsHint");
+  const goal = state.goal || {};
+
+  if (!goal.company && !goal.jobRole) {
+    if (hint) hint.textContent = "목표 기업 또는 직무 정보가 없어 채용공고를 불러올 수 없습니다.";
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/job-postings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company: goal.company || "",
+        jobRole: goal.jobRole || "",
+        skills: goal.skills || "",
+        certifications: goal.certifications || ""
+      })
+    });
+    const data = await res.json();
+    const postings = data.postings || [];
+
+    if (state.roadmap) state.roadmap.jobPostings = postings;
+    state.jobPostings = postings;
+
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (postings.length === 0) {
+      if (hint) hint.textContent = "🚀 정식 서비스(기업 API 연동) 오픈 시, 맞춤형 실시간 채용공고가 이곳에 표시됩니다.";
+      return;
+    }
+
+    if (hint) hint.textContent = "마감일이 가까운 공고와 반복 요구역량을 체크리스트에 반영합니다.";
+
+    postings.slice(0, 5).forEach((posting) => {
+      const item = document.createElement("article");
+      item.className = "job-posting-card";
+      const skills = (posting.requiredSkills || []).slice(0, 4);
+      const dDay = formatPostingDDay(posting.dDay);
+      const dDayClass = posting.dDay !== null && posting.dDay <= 7 && posting.dDay >= 0 ? "urgent" : "";
+      item.innerHTML = `
+        <div class="job-posting-main">
+          <strong>${escapeHtml(posting.company)}</strong>
+          <span class="job-dday ${dDayClass}">${escapeHtml(dDay)}</span>
+        </div>
+        <a href="${escapeHtml(posting.url || "#")}" target="_blank" rel="noreferrer">${escapeHtml(posting.title)}</a>
+        <div class="job-posting-meta">
+          <span>${escapeHtml(posting.region || "지역 미상")}</span>
+          <span>${escapeHtml(posting.career || "경력 무관")}</span>
+        </div>
+        ${skills.length ? `<div class="job-skill-tags">${skills.map(s => `<span>${escapeHtml(s)}</span>`).join("")}</div>` : ""}
+      `;
+      list.appendChild(item);
+    });
+  } catch (err) {
+    if (hint) hint.textContent = "채용공고를 불러오는 데 실패했습니다.";
+  }
 }
 
 function renderRoadmap() {
