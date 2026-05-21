@@ -193,6 +193,28 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.field textarea,
+.roadmap-editor textarea,
+.insight-grid textarea {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#skills {
+  min-height: 132px;
+  max-height: 132px;
+}
+
+#firstAction {
+  min-height: 78px;
+  max-height: 78px;
+}
+
+#portfolioDirection {
+  min-height: 118px;
+  max-height: 118px;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus,
