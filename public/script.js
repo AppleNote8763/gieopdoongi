@@ -37,6 +37,7 @@ const roleSuggestions = document.querySelector("#roleSuggestions");
 const fields = {
   company: document.querySelector("#company"),
   jobRole: document.querySelector("#jobRole"),
+  customJobRole: document.querySelector("#customJobRole"),
   skills: document.querySelector("#skills"),
   firstAction: document.querySelector("#firstAction"),
   portfolioDirection: document.querySelector("#portfolioDirection")
@@ -57,9 +58,11 @@ function getSelectedLevel() {
 }
 
 function collectGoal() {
+  const customJobRole = fields.customJobRole.value.trim();
+
   return {
     company: fields.company.value.trim(),
-    jobRole: fields.jobRole.value.trim(),
+    jobRole: customJobRole || fields.jobRole.value.trim(),
     skills: fields.skills.value.trim(),
     level: getSelectedLevel()
   };
@@ -135,6 +138,7 @@ function renderRoleSuggestions(roles) {
     button.textContent = role;
     button.addEventListener("click", () => {
       fields.jobRole.value = role;
+      fields.customJobRole.value = "";
       validateGoal(false);
       renderRoleSuggestions(roles);
     });
@@ -501,7 +505,13 @@ function loadRoadmapFromRecord(record) {
   state.savedRoadmapId = record.id;
 
   fields.company.value = state.goal.company;
-  fields.jobRole.value = state.goal.jobRole;
+  if (Array.from(fields.jobRole.options).some((option) => option.value === state.goal.jobRole)) {
+    fields.jobRole.value = state.goal.jobRole;
+    fields.customJobRole.value = "";
+  } else {
+    fields.jobRole.value = "";
+    fields.customJobRole.value = state.goal.jobRole;
+  }
   fields.skills.value = state.goal.skills;
   document.querySelectorAll('input[name="level"]').forEach((input) => {
     input.checked = input.value === state.goal.level;
@@ -596,10 +606,24 @@ async function persistProgress() {
 goalForm.addEventListener("input", () => validateGoal(false));
 goalForm.addEventListener("change", () => validateGoal(false));
 fields.jobRole.addEventListener("change", () => {
+  if (fields.jobRole.value) {
+    fields.customJobRole.value = "";
+  }
+
   const roles = Array.from(fields.jobRole.options)
     .map((option) => option.value)
     .filter(Boolean);
   renderRoleSuggestions(roles);
+});
+fields.customJobRole.addEventListener("input", () => {
+  if (fields.customJobRole.value.trim()) {
+    fields.jobRole.value = "";
+    renderRoleSuggestions(
+      Array.from(fields.jobRole.options)
+        .map((option) => option.value)
+        .filter(Boolean)
+    );
+  }
 });
 suggestRolesButton.addEventListener("click", suggestRoles);
 

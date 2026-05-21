@@ -198,6 +198,20 @@ function parseGeminiJson(text) {
 function getFallbackRoles(company) {
   const value = company.toLowerCase();
 
+  if (/(hyundai|kia|automotive|mobility|motor|vehicle|car|ev|현대자동차|현대차|기아|자동차|모빌리티|전기차|자율주행|차량)/i.test(value)) {
+    return [
+      "차량 제어 소프트웨어 개발",
+      "자율주행/ADAS 엔지니어",
+      "전동화 시스템 개발",
+      "커넥티드카 서비스 개발",
+      "차량 데이터 분석",
+      "임베디드 소프트웨어 개발",
+      "생산기술/스마트팩토리",
+      "품질보증/차량 검증",
+      "모빌리티 서비스 기획"
+    ];
+  }
+
   if (/(sound|audio|music|yamaha|shure|bose|sony|음향|오디오|악기|레코딩|사운드)/i.test(value)) {
     return [
       "오디오 DSP 엔지니어",
@@ -257,7 +271,19 @@ function normalizeRoles(parsed, company) {
     .filter(Boolean)
     .slice(0, 10);
 
-  return cleanRoles.length > 0 ? cleanRoles : getFallbackRoles(company);
+  const fallbackRoles = getFallbackRoles(company);
+  const genericFallbackRoles = getFallbackRoles("");
+  const hasIndustryFallback = fallbackRoles.join("|") !== genericFallbackRoles.join("|");
+
+  if (cleanRoles.length === 0) {
+    return fallbackRoles;
+  }
+
+  if (hasIndustryFallback) {
+    return Array.from(new Set([...fallbackRoles.slice(0, 7), ...cleanRoles])).slice(0, 10);
+  }
+
+  return cleanRoles;
 }
 
 async function generateRoleSuggestions(company) {
