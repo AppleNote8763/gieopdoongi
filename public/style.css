@@ -1007,6 +1007,7 @@ ol li {
     flex-direction: column;
     align-items: flex-start;
     padding: 20px 24px;
+    position: relative; /* 모바일에서는 스크롤 시 밀려 올라가도록 sticky 해제 */
   }
 
   .header-actions {
