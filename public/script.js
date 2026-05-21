@@ -3,7 +3,9 @@ const state = {
     company: "",
     jobRole: "",
     skills: "",
-    level: ""
+    level: "",
+    targetPeriod: "",
+    certifications: ""
   },
   roadmap: null,
   savedRoadmapId: null,
@@ -29,6 +31,12 @@ const saveButton = document.querySelector("#saveButton");
 const startProgressButton = document.querySelector("#startProgressButton");
 const suggestRolesButton = document.querySelector("#suggestRolesButton");
 const suggestSkillsButton = document.querySelector("#suggestSkillsButton");
+const recommendCertsButton = document.querySelector("#recommendCertsButton");
+const certSuggestions = document.querySelector("#certSuggestions");
+const certHint = document.querySelector("#certHint");
+const progressSaveButtonRow = document.querySelector("#progressSaveButtonRow");
+const progressSaveButton = document.querySelector("#progressSaveButton");
+const progressSaveStatus = document.querySelector("#progressSaveStatus");
 const loadingBox = document.querySelector("#loadingBox");
 const roadmapContent = document.querySelector("#roadmapContent");
 const saveStatus = document.querySelector("#saveStatus");
@@ -43,6 +51,8 @@ const fields = {
   jobRole: document.querySelector("#jobRole"),
   customJobRole: document.querySelector("#customJobRole"),
   skills: document.querySelector("#skills"),
+  targetPeriod: document.querySelector("#targetPeriod"),
+  certifications: document.querySelector("#certifications"),
   firstAction: document.querySelector("#firstAction"),
   portfolioDirection: document.querySelector("#portfolioDirection")
 };
@@ -81,7 +91,9 @@ function collectGoal() {
     company: fields.company.value.trim(),
     jobRole: customJobRole || fields.jobRole.value.trim(),
     skills: selectedSkills.join(", "),
-    level: getSelectedLevel()
+    level: getSelectedLevel(),
+    targetPeriod: fields.targetPeriod.value,
+    certifications: fields.certifications.value.trim()
   };
 }
 
@@ -303,6 +315,14 @@ function updateAuthUI() {
       : "";
   }
 
+  if (progressSaveButtonRow) {
+    if (isLoggedIn && state.roadmap && !state.savedRoadmapId) {
+      progressSaveButtonRow.classList.remove("hidden");
+    } else {
+      progressSaveButtonRow.classList.add("hidden");
+    }
+  }
+
   updateProgressHint();
 }
 
@@ -481,41 +501,61 @@ async function generateRoadmap() {
 
 async function saveRoadmap() {
   if (!state.session) {
-    saveStatus.textContent = "로그인 후에만 로드맵을 저장할 수 있습니다.";
+    const msg = "로그인 후에만 로드맵을 저장할 수 있습니다.";
+    saveStatus.textContent = msg;
+    if (progressSaveStatus) progressSaveStatus.textContent = msg;
     showPanel("login");
     return;
   }
 
   syncEditableRoadmap();
   saveButton.disabled = true;
+  if (progressSaveButton) progressSaveButton.disabled = true;
   saveStatus.textContent = "저장 중입니다...";
+  if (progressSaveStatus) progressSaveStatus.textContent = "저장 중입니다...";
 
   const progress = calculateProgress();
-  const response = await fetch("/api/save-roadmap", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      ...state.goal,
-      roadmap: state.roadmap,
-      progress
-    })
-  });
+  try {
+    const response = await fetch("/api/save-roadmap", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({
+        ...state.goal,
+        roadmap: state.roadmap,
+        progress
+      })
+    });
 
-  const data = await response.json();
-  if (!response.ok) {
-    saveStatus.textContent = data.message || "Supabase 저장에 실패했습니다.";
+    const data = await response.json();
+    if (!response.ok) {
+      const errMsg = data.message || "Supabase 저장에 실패했습니다.";
+      saveStatus.textContent = errMsg;
+      if (progressSaveStatus) progressSaveStatus.textContent = errMsg;
+      saveButton.disabled = false;
+      if (progressSaveButton) progressSaveButton.disabled = false;
+      return;
+    }
+
+    state.savedRoadmapId = data.roadmap.id;
+    const successMsg = "사용자 계정에 저장되었습니다.";
+    saveStatus.textContent = successMsg;
+    if (progressSaveStatus) progressSaveStatus.textContent = successMsg;
     saveButton.disabled = false;
-    return;
-  }
+    if (progressSaveButton) progressSaveButton.disabled = false;
 
-  state.savedRoadmapId = data.roadmap.id;
-  saveStatus.textContent = "사용자 계정에 저장되었습니다.";
-  saveButton.disabled = false;
-  await loadSavedRoadmaps();
-  updateProgressHint();
+    await loadSavedRoadmaps();
+    updateProgressHint();
+    updateAuthUI();
+  } catch (error) {
+    const errorMsg = error.message || "저장 오류가 발생했습니다.";
+    saveStatus.textContent = errorMsg;
+    if (progressSaveStatus) progressSaveStatus.textContent = errorMsg;
+    saveButton.disabled = false;
+    if (progressSaveButton) progressSaveButton.disabled = false;
+  }
 }
 
 async function loadSavedRoadmaps() {
@@ -575,7 +615,9 @@ function loadRoadmapFromRecord(record) {
     company: record.company,
     jobRole: record.job_role,
     skills: record.skills,
-    level: record.level
+    level: record.level,
+    targetPeriod: record.roadmap_result?.estimatedPeriod || "",
+    certifications: record.roadmap_result?.certifications || ""
   };
   state.roadmap = record.roadmap_result;
   state.savedRoadmapId = record.id;
@@ -597,6 +639,22 @@ function loadRoadmapFromRecord(record) {
   document.querySelectorAll('input[name="level"]').forEach((input) => {
     input.checked = input.value === state.goal.level;
   });
+
+  if (fields.targetPeriod) {
+    const matchingOption = Array.from(fields.targetPeriod.options).find(opt => 
+      opt.value === state.goal.targetPeriod || 
+      (state.goal.targetPeriod && opt.value.includes(state.goal.targetPeriod))
+    );
+    if (matchingOption) {
+      fields.targetPeriod.value = matchingOption.value;
+    } else {
+      fields.targetPeriod.value = "";
+    }
+  }
+
+  if (fields.certifications) {
+    fields.certifications.value = state.goal.certifications;
+  }
 
   enableStep("roadmap");
   enableStep("progress");
@@ -828,8 +886,74 @@ regenerateButton.addEventListener("click", async () => {
 
 saveButton.addEventListener("click", saveRoadmap);
 
-startProgressButton.addEventListener("click", () => {
+function recommendCertifications() {
+  const customJobRole = fields.customJobRole.value.trim();
+  const selectedJob = customJobRole || fields.jobRole.value.trim();
+
+  if (!selectedJob) {
+    certHint.textContent = "희망 직무를 먼저 선택하거나 입력해주세요.";
+    certHint.style.color = "#dc2626";
+    return;
+  }
+
+  certHint.textContent = "직무에 맞는 자격증 추천 목록입니다 (클릭해서 추가):";
+  certHint.style.color = "";
+
+  const certMap = {
+    "백엔드 개발": ["정보처리기사", "SQLD", "AWS Certified Solutions Architect", "AWS Certified Cloud Practitioner"],
+    "프론트엔드 개발": ["정보처리기사", "웹디자인기능사", "AWS Certified Cloud Practitioner"],
+    "풀스택 개발": ["정보처리기사", "SQLD", "AWS Certified Solutions Architect"],
+    "데이터 분석": ["ADsP (데이터분석준전문가)", "SQLD", "빅데이터분석기사", "사회조사분석사 2급"],
+    "AI/ML 엔지니어": ["ADsP (데이터분석준전문가)", "ADP (데이터분석전문가)", "빅데이터분석기사"],
+    "PM/서비스 기획": ["PMP (Project Management Professional)", "SQLD", "ADsP (데이터분석준전문가)", "컴퓨터활용능력 1급"],
+    "UI/UX 디자이너": ["GTQ 그래픽기술자격 1급", "웹디자인기능사", "컴퓨터그래픽스운용기능사"]
+  };
+
+  let certs = [];
+  const matchedKey = Object.keys(certMap).find(key => selectedJob.includes(key) || key.includes(selectedJob));
+  if (matchedKey) {
+    certs = certMap[matchedKey];
+  } else {
+    certs = ["정보처리기사", "SQLD", "ADsP", "AWS Certified Cloud Practitioner"];
+  }
+
+  certSuggestions.innerHTML = "";
+  certs.forEach((cert) => {
+    const button = document.createElement("button");
+    button.className = "role-chip";
+    button.type = "button";
+    button.textContent = cert;
+    button.addEventListener("click", () => {
+      let currentVal = fields.certifications.value.trim();
+      if (currentVal) {
+        const items = currentVal.split(/[,，]/).map(i => i.trim()).filter(Boolean);
+        if (!items.includes(cert)) {
+          items.push(cert);
+          fields.certifications.value = items.join(", ");
+        }
+      } else {
+        fields.certifications.value = cert;
+      }
+      validateGoal(false);
+    });
+    certSuggestions.appendChild(button);
+  });
+}
+
+recommendCertsButton.addEventListener("click", recommendCertifications);
+if (progressSaveButton) {
+  progressSaveButton.addEventListener("click", saveRoadmap);
+}
+
+startProgressButton.addEventListener("click", async () => {
   syncEditableRoadmap();
+
+  if (state.session && !state.savedRoadmapId) {
+    saveStatus.textContent = "진행 시작과 함께 로드맵을 자동으로 저장하는 중...";
+    if (progressSaveStatus) progressSaveStatus.textContent = "자동 저장 중...";
+    await saveRoadmap();
+  }
+
   enableStep("progress");
   renderProgress();
   showPanel("progress");

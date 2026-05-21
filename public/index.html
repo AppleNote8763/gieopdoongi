@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>기업둥이 - AI 취업 준비 플래너</title>
+    <meta name="description" content="기업둥이는 목표 기업, 희망 직무, 현재 보유 역량을 바탕으로 AI가 최적화된 맞춤형 취업 준비 로드맵과 실시간 진행 관리 체크리스트를 설계해주는 커리어 플래너 서비스입니다." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -168,6 +172,36 @@
                 <small class="error-text"></small>
               </label>
 
+              <label class="field">
+                <span>희망 준비 기간</span>
+                <select id="targetPeriod" name="targetPeriod">
+                  <option value="">AI 추천 (기업·직무 난이도 분석)</option>
+                  <option value="1개월">1개월 (4주)</option>
+                  <option value="3개월">3개월 (8~12주)</option>
+                  <option value="6개월">6개월 (24주)</option>
+                  <option value="12개월">1년 (52주)</option>
+                </select>
+                <small class="helper-text">목표 기간에 딱 맞추어 학습 주차와 세부 실행 과제를 설계합니다.</small>
+              </label>
+
+              <label class="field">
+                <span>목표 자격증</span>
+                <div class="company-search-row">
+                  <input
+                    id="certifications"
+                    name="certifications"
+                    type="text"
+                    placeholder="예: 정보처리기사, SQLD, AWS 등 (직접 입력 가능)"
+                    autocomplete="off"
+                  />
+                  <button class="secondary-button compact-button" id="recommendCertsButton" type="button">
+                    자격증 추천
+                  </button>
+                </div>
+                <small class="helper-text" id="certHint">비워두시면 AI가 해당 직무에 우대되는 필수 자격증을 자동으로 판단해 포함합니다.</small>
+                <div class="cert-suggestions" id="certSuggestions"></div>
+              </label>
+
               <fieldset class="level-field">
                 <legend>경력 수준</legend>
                 <div class="level-options">
@@ -276,6 +310,10 @@
             <p class="eyebrow">Step 3</p>
             <h2>진행 관리</h2>
             <p id="progressSaveHint">로그인 후 저장한 로드맵만 진행률을 서버에 저장할 수 있습니다.</p>
+            <div id="progressSaveButtonRow" class="hidden" style="margin: 16px 0;">
+              <button class="primary-button" id="progressSaveButton" type="button" style="width: 100%;">이 로드맵 저장하기</button>
+              <p class="helper-text" id="progressSaveStatus" style="margin-top: 8px; text-align: center; font-size: 13px;"></p>
+            </div>
             <div class="progress-card">
               <div>
                 <span>전체 진행률</span>
