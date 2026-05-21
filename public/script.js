@@ -308,7 +308,10 @@ function updateAuthUI() {
   const isLoggedIn = Boolean(state.session);
   const email = state.session?.user?.email || "로그인하지 않음";
 
-  document.querySelector("#userEmail").textContent = email;
+  const userEmailEl = document.querySelector("#userEmail");
+  userEmailEl.textContent = email;
+  userEmailEl.classList.toggle("hidden", !isLoggedIn);
+  
   document.querySelector("#showLoginButton").classList.toggle("hidden", isLoggedIn);
   document.querySelector("#showSignupButton").classList.toggle("hidden", isLoggedIn);
   document.querySelector("#logoutButton").classList.toggle("hidden", !isLoggedIn);
@@ -430,7 +433,10 @@ async function initSupabaseAuth() {
   updateAuthUI();
 
   if (state.session) {
-    await loadSavedRoadmaps();
+    const roadmaps = await loadSavedRoadmaps();
+    if (roadmaps && roadmaps.length > 0) {
+      loadRoadmapFromRecord(roadmaps[0]);
+    }
   }
 
   state.supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -438,8 +444,12 @@ async function initSupabaseAuth() {
     updateAuthUI();
 
     if (session) {
-      await loadSavedRoadmaps();
-      showPanel("goal");
+      const roadmaps = await loadSavedRoadmaps();
+      if (roadmaps && roadmaps.length > 0) {
+        loadRoadmapFromRecord(roadmaps[0]);
+      } else {
+        showPanel("goal");
+      }
     } else {
       state.savedRoadmapId = null;
       renderSavedRoadmaps([]);
@@ -564,7 +574,7 @@ async function saveRoadmap() {
 async function loadSavedRoadmaps() {
   if (!state.session) {
     renderSavedRoadmaps([]);
-    return;
+    return [];
   }
 
   const response = await fetch("/api/roadmaps", {
@@ -576,10 +586,11 @@ async function loadSavedRoadmaps() {
     document.querySelector("#savedRoadmapsHint").textContent =
       data.message || "이전 로드맵을 불러오지 못했습니다.";
     renderSavedRoadmaps([]);
-    return;
+    return [];
   }
 
   renderSavedRoadmaps(data.roadmaps || []);
+  return data.roadmaps || [];
 }
 
 function renderSavedRoadmaps(roadmaps) {

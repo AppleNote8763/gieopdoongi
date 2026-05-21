@@ -308,12 +308,21 @@ textarea {
   border-radius: var(--radius-sm);
   padding: 12px 16px;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.9);
   outline: none;
   resize: none;
   overflow-wrap: anywhere;
   font-size: 14px;
   transition: all 0.2s ease;
+}
+
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230f172a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
 }
 
 .field textarea,
@@ -341,7 +350,7 @@ textarea {
 .roadmap-editor textarea:focus,
 .insight-grid textarea:focus {
   border-color: var(--primary);
-  background: #ffffff;
+  background-color: #ffffff;
   box-shadow: var(--shadow-focus);
 }
 
@@ -349,7 +358,7 @@ textarea {
 .field.invalid select,
 .field.invalid textarea {
   border-color: #ef4444;
-  background: #fef2f2;
+  background-color: #fef2f2;
 }
 
 .error-text {
@@ -1016,7 +1025,7 @@ ol li {
   }
 
   .user-box {
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .goal-layout,
