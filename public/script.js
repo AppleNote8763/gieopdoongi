@@ -8,6 +8,7 @@ const state = {
     certifications: ""
   },
   roadmap: null,
+  jobPostings: [],
   savedRoadmapId: null,
   session: null,
   supabase: null
@@ -46,6 +47,47 @@ const skillHint = document.querySelector("#skillHint");
 const skillSuggestions = document.querySelector("#skillSuggestions");
 let draggedChecklistIndex = null;
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatPostingDDay(dDay) {
+  if (dDay === null || dDay === undefined) {
+    return "마감일 확인";
+  }
+  if (dDay < 0) {
+    return "마감됨";
+  }
+  if (dDay === 0) {
+    return "D-Day";
+  }
+  return `D-${dDay}`;
+}
+
+function formatUpdatedAt(value) {
+  if (!value) {
+    return "고용24 연동";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "고용24 연동";
+  }
+
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")} 갱신`;
+}
+
+function on(element, eventName, handler) {
+  if (element) {
+    element.addEventListener(eventName, handler);
+  }
+}
+
 const fields = {
   company: document.querySelector("#company"),
   jobRole: document.querySelector("#jobRole"),
@@ -60,14 +102,16 @@ const fields = {
 };
 
 function showPanel(name) {
-  // 비로그인 사용자의 보호된 페이지(로드맵 생성 결과, 진행 관리) 접근 차단
-  const protectedPanels = ["roadmap", "progress"];
+  // 비로그인 사용자도 목표 설정과 로드맵 생성 결과는 볼 수 있고, 저장/진행 관리는 로그인 후 사용합니다.
+  const protectedPanels = ["progress"];
   if (!state.session && protectedPanels.includes(name)) {
     name = "login";
   }
 
   Object.entries(panels).forEach(([panelName, panel]) => {
-    panel.classList.toggle("active", panelName === name);
+    if (panel) {
+      panel.classList.toggle("active", panelName === name);
+    }
   });
 
   stepButtons.forEach((button) => {
@@ -309,8 +353,12 @@ function enableStep(name) {
 }
 
 function setLoading(isLoading) {
-  loadingBox.classList.toggle("hidden", !isLoading);
-  roadmapContent.classList.toggle("hidden", isLoading);
+  if (loadingBox) {
+    loadingBox.classList.toggle("hidden", !isLoading);
+  }
+  if (roadmapContent) {
+    roadmapContent.classList.toggle("hidden", isLoading);
+  }
   generateButton.disabled = isLoading;
   regenerateButton.disabled = isLoading;
   saveButton.disabled = isLoading || !state.session;
@@ -357,6 +405,9 @@ function updateAuthUI() {
 
 function updateProgressHint() {
   const hint = document.querySelector("#progressSaveHint");
+  if (!hint) {
+    return;
+  }
 
   if (!state.session) {
     hint.textContent = "비로그인 상태에서는 진행률을 서버에 저장할 수 없습니다.";
@@ -415,6 +466,55 @@ function renderWeeks() {
   });
 }
 
+function renderJobPostings() {
+  const list = document.querySelector("#jobPostingList");
+  const hint = document.querySelector("#jobPostingsHint");
+  const updatedAt = document.querySelector("#jobPostingsUpdatedAt");
+  const postings = state.roadmap?.jobPostings || state.jobPostings || [];
+
+  if (!list) {
+    return;
+  }
+
+  if (updatedAt) {
+    updatedAt.textContent = formatUpdatedAt(state.roadmap?.jobInsights?.updatedAt);
+  }
+  list.innerHTML = "";
+
+  if (postings.length === 0) {
+    hint.textContent = "WORK24_API_KEY를 설정하면 목표 기업/직무 기준 최신 공고가 표시됩니다.";
+    return;
+  }
+
+  hint.textContent = "마감일이 가까운 공고와 반복 요구역량을 체크리스트에 반영합니다.";
+
+  postings.slice(0, 5).forEach((posting) => {
+    const item = document.createElement("article");
+    item.className = "job-posting-card";
+    const skills = (posting.requiredSkills || []).slice(0, 4);
+    const dDay = formatPostingDDay(posting.dDay);
+    const dDayClass = posting.dDay !== null && posting.dDay <= 7 && posting.dDay >= 0 ? "urgent" : "";
+
+    item.innerHTML = `
+      <div class="job-posting-main">
+        <strong>${escapeHtml(posting.company)}</strong>
+        <span class="job-dday ${dDayClass}">${escapeHtml(dDay)}</span>
+      </div>
+      <a href="${escapeHtml(posting.url || "#")}" target="_blank" rel="noreferrer">${escapeHtml(posting.title)}</a>
+      <div class="job-posting-meta">
+        <span>${escapeHtml(posting.region || "지역 미상")}</span>
+        <span>${escapeHtml(posting.career || "경력 무관")}</span>
+      </div>
+      ${
+        skills.length
+          ? `<div class="job-skill-tags">${skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join("")}</div>`
+          : ""
+      }
+    `;
+    list.appendChild(item);
+  });
+}
+
 function renderRoadmap() {
   document.querySelector("#estimatedPeriod").textContent =
     `예상 준비 기간: ${state.roadmap.estimatedPeriod || "4주"}`;
@@ -427,6 +527,7 @@ function renderRoadmap() {
 
   fields.firstAction.textContent = state.roadmap.firstAction || "";
   fields.portfolioDirection.textContent = state.roadmap.portfolioDirection || "";
+  renderJobPostings();
   saveButton.disabled = !state.session;
 }
 
@@ -505,14 +606,16 @@ async function signOut() {
   // 상태 완전 초기화
   state.session = null;
   state.roadmap = null;
+  state.jobPostings = [];
   state.savedRoadmapId = null;
   state.goal = {};
 
   // 폼 및 화면 초기화
   goalForm.reset();
   fields.customJobRole.value = "";
-  document.querySelector('#roadmapContent').innerHTML = "";
-  document.querySelector('#checklistBox').innerHTML = "";
+  if (roadmapContent) roadmapContent.classList.add("hidden");
+  const checklistBox = document.querySelector("#checklist");
+  if (checklistBox) checklistBox.innerHTML = "";
 
   // 스토리지 완벽 초기화
   localStorage.clear();
@@ -548,6 +651,10 @@ async function generateRoadmap() {
   }
 
   state.roadmap = data.roadmap;
+  state.jobPostings = data.jobPostings || data.roadmap?.jobPostings || [];
+  if (state.jobPostings.length > 0) {
+    state.roadmap.jobPostings = state.jobPostings;
+  }
   if (data.certSchedules) {
     state.roadmap.certSchedules = data.certSchedules;
   }
@@ -681,6 +788,7 @@ function loadRoadmapFromRecord(record) {
     createdAt: record.created_at
   };
   state.roadmap = record.roadmap_result;
+  state.jobPostings = state.roadmap?.jobPostings || [];
   state.savedRoadmapId = record.id;
 
   fields.company.value = state.goal.company;
@@ -784,12 +892,6 @@ function renderProgress() {
     periodEl.textContent = `${formatDt(startDate)} ~ ${formatDt(endDate)} (${state.goal?.targetPeriod || state.roadmap?.estimatedPeriod || targetDays + "일"})`;
   }
   
-  // Mock Job Postings
-  const mockJob1 = document.querySelector("#mockJob1");
-  const mockJob2 = document.querySelector("#mockJob2");
-  if (mockJob1) mockJob1.textContent = `네이버 - ${jobRoleStr}`;
-  if (mockJob2) mockJob2.textContent = `토스 - ${jobRoleStr}`;
-  
   const now = new Date();
   const elapsedMs = now - startDate;
   const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
@@ -849,6 +951,8 @@ function renderProgress() {
     certContainer.classList.add("hidden");
     certList.innerHTML = "";
   }
+
+  renderJobPostings();
 
   const checklistBox = document.querySelector("#checklist");
   checklistBox.innerHTML = "";
@@ -968,10 +1072,10 @@ async function persistProgress() {
   });
 }
 
-goalForm.addEventListener("input", () => validateGoal(false));
-goalForm.addEventListener("change", () => validateGoal(false));
+on(goalForm, "input", () => validateGoal(false));
+on(goalForm, "change", () => validateGoal(false));
 
-fields.targetPeriod.addEventListener("change", () => {
+on(fields.targetPeriod, "change", () => {
   fields.customTargetPeriod.classList.add("hidden");
   fields.targetDateInput.classList.add("hidden");
   fields.customTargetPeriod.value = "";
@@ -986,9 +1090,9 @@ fields.targetPeriod.addEventListener("change", () => {
   }
   validateGoal(false);
 });
-fields.customTargetPeriod.addEventListener("input", () => validateGoal(false));
-fields.targetDateInput.addEventListener("input", () => validateGoal(false));
-fields.jobRole.addEventListener("change", () => {
+on(fields.customTargetPeriod, "input", () => validateGoal(false));
+on(fields.targetDateInput, "input", () => validateGoal(false));
+on(fields.jobRole, "change", () => {
   if (fields.jobRole.value) {
     fields.customJobRole.value = "";
   }
@@ -998,7 +1102,7 @@ fields.jobRole.addEventListener("change", () => {
     .filter(Boolean);
   renderRoleSuggestions(roles);
 });
-fields.customJobRole.addEventListener("input", () => {
+on(fields.customJobRole, "input", () => {
   if (fields.customJobRole.value.trim()) {
     fields.jobRole.value = "";
     renderRoleSuggestions(
@@ -1008,10 +1112,10 @@ fields.customJobRole.addEventListener("input", () => {
     );
   }
 });
-suggestSkillsButton.addEventListener("click", suggestSkills);
-suggestRolesButton.addEventListener("click", suggestRoles);
+on(suggestSkillsButton, "click", suggestSkills);
+on(suggestRolesButton, "click", suggestRoles);
 
-goalForm.addEventListener("submit", async (event) => {
+on(goalForm, "submit", async (event) => {
   event.preventDefault();
 
   if (!validateGoal(true)) {
@@ -1026,7 +1130,7 @@ goalForm.addEventListener("submit", async (event) => {
   }
 });
 
-loginForm.addEventListener("submit", async (event) => {
+on(loginForm, "submit", async (event) => {
   event.preventDefault();
 
   const email = document.querySelector("#loginEmail").value.trim();
@@ -1046,7 +1150,7 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-signupForm.addEventListener("submit", async (event) => {
+on(signupForm, "submit", async (event) => {
   event.preventDefault();
 
   const email = document.querySelector("#signupEmail").value.trim();
@@ -1066,7 +1170,7 @@ signupForm.addEventListener("submit", async (event) => {
   }
 });
 
-regenerateButton.addEventListener("click", async () => {
+on(regenerateButton, "click", async () => {
   try {
     await generateRoadmap();
   } catch (error) {
@@ -1075,7 +1179,7 @@ regenerateButton.addEventListener("click", async () => {
   }
 });
 
-saveButton.addEventListener("click", saveRoadmap);
+on(saveButton, "click", saveRoadmap);
 
 function recommendCertifications() {
   const customJobRole = fields.customJobRole.value.trim();
@@ -1131,12 +1235,12 @@ function recommendCertifications() {
   });
 }
 
-recommendCertsButton.addEventListener("click", recommendCertifications);
+on(recommendCertsButton, "click", recommendCertifications);
 if (progressSaveButton) {
-  progressSaveButton.addEventListener("click", saveRoadmap);
+  on(progressSaveButton, "click", saveRoadmap);
 }
 
-startProgressButton.addEventListener("click", async () => {
+on(startProgressButton, "click", async () => {
   syncEditableRoadmap();
 
   if (state.session && !state.savedRoadmapId) {
@@ -1150,14 +1254,14 @@ startProgressButton.addEventListener("click", async () => {
   showPanel("progress");
 });
 
-document.querySelector("#showLoginButton").addEventListener("click", () => showPanel("login"));
-document.querySelector("#showSignupButton").addEventListener("click", () => showPanel("signup"));
-document.querySelector("#goSignupButton").addEventListener("click", () => showPanel("signup"));
-document.querySelector("#goLoginButton").addEventListener("click", () => showPanel("login"));
-document.querySelector("#logoutButton").addEventListener("click", signOut);
+on(document.querySelector("#showLoginButton"), "click", () => showPanel("login"));
+on(document.querySelector("#showSignupButton"), "click", () => showPanel("signup"));
+on(document.querySelector("#goSignupButton"), "click", () => showPanel("signup"));
+on(document.querySelector("#goLoginButton"), "click", () => showPanel("login"));
+on(document.querySelector("#logoutButton"), "click", signOut);
 
 stepButtons.forEach((button) => {
-  button.addEventListener("click", () => {
+  on(button, "click", () => {
     if (!button.disabled) {
       showPanel(button.dataset.stepButton);
     }
@@ -1243,6 +1347,10 @@ if (recalcPeriodButton) {
       }
       
       state.roadmap = data.roadmap;
+      state.jobPostings = data.jobPostings || data.roadmap?.jobPostings || state.jobPostings;
+      if (state.jobPostings.length > 0) {
+        state.roadmap.jobPostings = state.jobPostings;
+      }
       if (data.certSchedules) {
         state.roadmap.certSchedules = data.certSchedules;
       }

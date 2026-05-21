@@ -737,6 +737,44 @@ textarea {
 }
 
 /* Roadmap Grid Layouts and Cards */
+.roadmap-content {
+  display: grid;
+  gap: 20px;
+}
+
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.roadmap-block {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.roadmap-block h3 {
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.roadmap-block p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.emphasis-block {
+  border-color: rgba(5, 150, 105, 0.24);
+  background: var(--green-soft);
+}
+
 .insight-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -846,9 +884,77 @@ ol li {
 }
 
 /* Progress Management Styling */
+.progress-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dashboard-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-header h2 {
+  margin: 4px 0 8px;
+  font-size: 20px;
+}
+
+.dashboard-period {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.d-day-banner {
+  padding: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  background: var(--primary-soft);
+  text-align: center;
+}
+
+.d-day-banner h3 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.d-day-banner p {
+  margin: 0;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-progress-group {
+  display: grid;
+  gap: 12px;
+}
+
 .progress-card {
   margin-top: 20px;
   background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(243,244,246,0.5) 100%);
+}
+
+.compact-card {
+  margin-top: 0;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.progress-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-card-head span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .progress-card strong {
@@ -860,10 +966,178 @@ ol li {
   letter-spacing: -1px;
 }
 
+.compact-card strong {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
 .progress-card p {
   margin: 0 0 14px;
   font-size: 13px;
   font-weight: 500;
+}
+
+.compact-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  text-align: right;
+  font-size: 12px;
+}
+
+.dashboard-widgets {
+  display: grid;
+  gap: 12px;
+}
+
+.mini-panel {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+}
+
+.mini-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mini-panel h3,
+.mini-panel-head h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mini-panel-head span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.job-posting-list {
+  display: grid;
+  gap: 10px;
+}
+
+.job-posting-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.job-posting-main,
+.job-posting-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.job-posting-main strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-posting-card a {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.job-posting-card a:hover {
+  color: var(--primary);
+}
+
+.job-dday {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.job-dday.urgent {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.job-posting-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.job-skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.job-skill-tags span {
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: var(--green-strong);
+  background: var(--green-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dashboard-actions,
+.recalc-form,
+.custom-checklist-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.recalc-form,
+.custom-checklist-form {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--page);
+}
+
+.custom-checklist-form {
+  margin-top: 32px;
+}
+
+.custom-checklist-form h3 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.custom-checklist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.checklist-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .progress-bar {
@@ -1023,6 +1297,10 @@ ol li {
   .insight-grid.two-column {
     grid-template-columns: 1fr;
   }
+
+  .roadmap-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1092,8 +1370,16 @@ ol li {
 
   .level-options,
   .button-row,
-  .skill-suggestions {
+  .skill-suggestions,
+  .custom-checklist-grid {
     grid-template-columns: 1fr;
+  }
+
+  .checklist-heading,
+  .job-posting-main,
+  .job-posting-meta {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .check-item {

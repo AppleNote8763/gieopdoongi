@@ -15,6 +15,22 @@ const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY;
 const geminiModel = "gemini-2.5-flash";
+const work24ApiKey = process.env.WORK24_API_KEY || process.env.WORKNET_API_KEY;
+const WORK24_LIST_URL =
+  "https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo210L01.do";
+const JOB_POSTING_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const jobPostingCache = new Map();
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 const CERT_SCHEDULES = {
   "정보처리기사": { 접수일: "2026-06-10", 시험일: "2026-07-20", 발표일: "2026-08-15" },
@@ -27,6 +43,304 @@ const supabaseAdmin =
   supabaseUrl && supabaseServiceRoleKey
     ? createClient(supabaseUrl, supabaseServiceRoleKey)
     : null;
+
+function decodeXml(value) {
+  return String(value || "")
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+function getXmlTag(xml, tagName) {
+  const match = String(xml || "").match(new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i"));
+  return match ? decodeXml(match[1]) : "";
+}
+
+function getXmlBlocks(xml, tagName) {
+  return Array.from(
+    String(xml || "").matchAll(new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "gi"))
+  ).map((match) => match[1]);
+}
+
+function normalizeDate(value) {
+  const text = String(value || "").trim();
+  const digits = text.replace(/\D/g, "");
+
+  if (digits.length >= 8) {
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  }
+
+  if (text.includes("채용시")) {
+    return "";
+  }
+
+  return text;
+}
+
+function calculateDDay(closeDate) {
+  const normalized = normalizeDate(closeDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return null;
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const deadline = new Date(`${normalized}T00:00:00`);
+  return Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+}
+
+function uniq(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function extractRequirements(text) {
+  const source = String(text || "").toLowerCase();
+  const skills = [
+    "JavaScript",
+    "TypeScript",
+    "React",
+    "Vue",
+    "Node.js",
+    "Java",
+    "Spring",
+    "Python",
+    "Django",
+    "SQL",
+    "MySQL",
+    "PostgreSQL",
+    "AWS",
+    "Docker",
+    "Kubernetes",
+    "Git",
+    "Figma",
+    "QA",
+    "테스트",
+    "자동화",
+    "데이터 분석",
+    "머신러닝"
+  ];
+  const certs = ["정보처리기사", "SQLD", "ADsP", "AWS", "컴퓨터활용능력 1급"];
+
+  const requiredSkills = skills.filter((skill) => source.includes(skill.toLowerCase()));
+  const certifications = certs.filter((cert) => source.includes(cert.toLowerCase()));
+
+  return {
+    requiredSkills: uniq(requiredSkills),
+    preferredRequirements: source.includes("우대") ? ["공고 내 우대 조건 확인 필요"] : [],
+    certifications: uniq(certifications)
+  };
+}
+
+function normalizeJobPosting(item, goal = {}) {
+  const sourceText = [
+    item.title,
+    item.company,
+    item.industry,
+    goal.jobRole,
+    goal.skills,
+    goal.certifications
+  ].join(" ");
+  const requirements = extractRequirements(sourceText);
+  const closeDate = normalizeDate(item.closeDate);
+
+  return {
+    id: item.id || item.wantedAuthNo || `${item.company}-${item.title}`,
+    company: item.company || "회사명 미상",
+    title: item.title || "채용공고",
+    jobRole: goal.jobRole || item.jobsCode || "",
+    region: item.region || "",
+    career: item.career || "",
+    requiredSkills: requirements.requiredSkills,
+    preferredRequirements: requirements.preferredRequirements,
+    certifications: requirements.certifications,
+    closeDate,
+    dDay: calculateDDay(closeDate),
+    url: item.url || "",
+    source: "고용24"
+  };
+}
+
+function parseWork24ListXml(xml, goal) {
+  const wantedBlocks = getXmlBlocks(xml, "wanted");
+
+  return {
+    total: Number(getXmlTag(xml, "total") || wantedBlocks.length || 0),
+    postings: wantedBlocks.map((block) =>
+      normalizeJobPosting(
+        {
+          id: getXmlTag(block, "wantedAuthNo"),
+          company: getXmlTag(block, "company"),
+          industry: getXmlTag(block, "indTpNm"),
+          title: getXmlTag(block, "title"),
+          region: getXmlTag(block, "region"),
+          career: getXmlTag(block, "career"),
+          closeDate: getXmlTag(block, "closeDt"),
+          url: getXmlTag(block, "wantedInfoUrl") || getXmlTag(block, "wantedMobileInfoUrl"),
+          jobsCode: getXmlTag(block, "jobsCd")
+        },
+        goal
+      )
+    )
+  };
+}
+
+function getJobPostingCacheKey(goal) {
+  return [goal.company, goal.jobRole, goal.skills, goal.certifications]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .join("|");
+}
+
+function scorePosting(posting, goal) {
+  const company = String(goal.company || "").toLowerCase();
+  const role = String(goal.jobRole || "").toLowerCase();
+  const title = `${posting.company} ${posting.title} ${posting.jobRole}`.toLowerCase();
+  let score = 0;
+
+  if (company && title.includes(company)) score += 5;
+  role.split(/[,\s/]+/).filter(Boolean).forEach((token) => {
+    if (title.includes(token)) score += 2;
+  });
+  score += posting.requiredSkills.length;
+  if (posting.dDay !== null && posting.dDay >= 0) score += Math.max(0, 3 - Math.floor(posting.dDay / 14));
+
+  return score;
+}
+
+async function fetchWork24JobPostings(goal, options = {}) {
+  const cacheKey = getJobPostingCacheKey(goal);
+  const cached = jobPostingCache.get(cacheKey);
+  const now = Date.now();
+
+  if (!options.forceRefresh && cached && now - cached.updatedAt < JOB_POSTING_CACHE_TTL_MS) {
+    return { ...cached.data, cached: true, updatedAt: cached.updatedAt };
+  }
+
+  if (!work24ApiKey) {
+    return {
+      postings: [],
+      total: 0,
+      updatedAt: now,
+      message: "WORK24_API_KEY가 설정되지 않았습니다."
+    };
+  }
+
+  const keyword = uniq([goal.company, goal.jobRole].map((value) => String(value || "").trim()))
+    .join(" ");
+  const params = new URLSearchParams({
+    authKey: work24ApiKey,
+    callTp: "L",
+    returnType: "XML",
+    startPage: "1",
+    display: String(options.display || 10),
+    sortOrderBy: "DESC"
+  });
+
+  if (keyword) {
+    params.set("keyword", keyword);
+  }
+
+  const response = await fetchWithTimeout(`${WORK24_LIST_URL}?${params.toString()}`, {}, 12000);
+  const xml = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`고용24 API 오류: ${response.status} ${xml.slice(0, 160)}`);
+  }
+
+  const parsed = parseWork24ListXml(xml, goal);
+  const postings = parsed.postings
+    .sort((a, b) => scorePosting(b, goal) - scorePosting(a, goal))
+    .slice(0, options.display || 10);
+  const data = { total: parsed.total, postings, updatedAt: now };
+
+  jobPostingCache.set(cacheKey, { updatedAt: now, data });
+  return data;
+}
+
+function buildCertSchedulesFromRoadmap(roadmap, input) {
+  const text = JSON.stringify({
+    certifications: input.certifications,
+    jobRole: input.jobRole,
+    roadmap,
+    jobPostings: input.jobPostings || []
+  });
+
+  return Object.keys(CERT_SCHEDULES)
+    .filter((cert) => text.includes(cert))
+    .map((cert) => ({
+      name: cert,
+      schedule: CERT_SCHEDULES[cert]
+    }));
+}
+
+function applyJobPostingInsights(roadmap, input) {
+  const postings = Array.isArray(input.jobPostings) ? input.jobPostings : [];
+  if (postings.length === 0) {
+    return roadmap;
+  }
+
+  const requiredSkills = uniq(postings.flatMap((posting) => posting.requiredSkills || []));
+  const certifications = uniq(postings.flatMap((posting) => posting.certifications || []));
+  const topPostings = postings.slice(0, 3);
+  const jobChecklist = [];
+
+  topPostings.forEach((posting, index) => {
+    const dDayText = posting.dDay === null ? "마감일 확인" : posting.dDay < 0 ? "마감됨" : `D-${posting.dDay}`;
+    jobChecklist.push({
+      id: `job-posting-${posting.id || index}`,
+      title: `${posting.company} 공고 분석 (${dDayText})`,
+      description: `${posting.title} 공고의 필수/우대 역량을 이력서와 체크리스트에 반영하세요.`,
+      duration: "1일",
+      done: false
+    });
+  });
+
+  requiredSkills.slice(0, 5).forEach((skill) => {
+    jobChecklist.push({
+      id: `job-skill-${skill}`,
+      title: `${skill} 채용공고 요구역량 보강`,
+      description: `최신 관련 공고에서 반복적으로 보이는 ${skill} 요구사항을 학습하고 포트폴리오에 증거를 남기세요.`,
+      duration: "3-5일",
+      done: false
+    });
+  });
+
+  certifications.forEach((cert) => {
+    jobChecklist.push({
+      id: `job-cert-${cert}`,
+      title: `${cert} 우대 조건 대응`,
+      description: `${cert} 자격증 일정과 준비 범위를 확인하고 로드맵에 반영하세요.`,
+      duration: "1주",
+      done: false
+    });
+  });
+
+  return {
+    ...roadmap,
+    coreSkills: uniq([...requiredSkills, ...(roadmap.coreSkills || [])]),
+    priorities: uniq([
+      ...requiredSkills.map((skill) => `${skill} 실무 증거 만들기`),
+      ...(certifications.length ? certifications.map((cert) => `${cert} 시험 일정 확인`) : []),
+      ...(roadmap.priorities || [])
+    ]),
+    gaps: uniq([
+      ...requiredSkills.map((skill) => `채용공고 기준 ${skill} 활용 경험 보강`),
+      ...(roadmap.gaps || [])
+    ]),
+    checklist: uniq([...jobChecklist, ...(roadmap.checklist || [])].map((item) => JSON.stringify(item))).map((item) =>
+      JSON.parse(item)
+    ),
+    jobPostings: postings,
+    jobInsights: {
+      requiredSkills,
+      certifications,
+      updatedAt: new Date().toISOString()
+    }
+  };
+}
 
 function validateGoalInput(body) {
   const required = ["company", "jobRole", "level"];
@@ -494,7 +808,7 @@ async function generateSkillSuggestions(company, jobRole) {
 
 async function generateWithGemini(input) {
   if (!geminiApiKey) {
-    return getFallbackRoadmap(input);
+    return applyJobPostingInsights(getFallbackRoadmap(input), input);
   }
 
   const relevantCerts = Object.keys(CERT_SCHEDULES).filter(cert => 
@@ -516,6 +830,10 @@ async function generateWithGemini(input) {
 희망 준비 기간: ${input.targetPeriod || "AI 추천"}
 목표 자격증: ${input.certifications || "AI 추천"}
 ${certSchedulesText}
+${input.jobPostings && input.jobPostings.length > 0 ? `\n[고용24 최신 관련 채용공고 분석]\n${input.jobPostings.slice(0, 5).map((posting) => {
+  const dDayText = posting.dDay === null ? "마감일 확인" : posting.dDay < 0 ? "마감됨" : `D-${posting.dDay}`;
+  return `- ${posting.company} / ${posting.title} / ${posting.region || "지역 미상"} / ${posting.career || "경력 무관"} / ${dDayText} / 요구기술: ${(posting.requiredSkills || []).join(", ") || "공고 확인 필요"} / 자격증: ${(posting.certifications || []).join(", ") || "공고 확인 필요"}`;
+}).join("\n")}\n* 위 실제 공고에서 반복되는 요구 기술, 우대사항, 자격증을 coreSkills, priorities, weeks, checklist에 우선 반영해줘.` : ""}
 ${input.completedTasks ? `\n[기존 완료된 학습/과제 항목 (보존 필수)]\n${input.completedTasks.map(t => `- ${t.title}`).join('\n')}\n* 주의: 사용자가 이미 완료한 위 항목들은 체크리스트(checklist) 배열의 앞부분에 반드시 포함시키고 (done: true로 설정), 남은 기간 동안 수행해야 할 새로운 항목들만 추가로 생성해줘. 임박한 시험 일정과 관련된 태스크는 최우선 순위(상단)로 배치해줘.` : ""}
 
 [작성 가이드라인]
@@ -553,28 +871,37 @@ ${input.completedTasks ? `\n[기존 완료된 학습/과제 항목 (보존 필�
 }
 `;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text:
-                "너는 채용 공고와 직무 역량을 분석해 초보자도 실행 가능한 취업 준비 계획을 만드는 커리어 코치야."
-            }
-          ]
-        },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4,
-          responseMimeType: "application/json"
-        }
-      })
+  let response;
+  try {
+    response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text:
+                  "너는 채용 공고와 직무 역량을 분석해 초보자도 실행 가능한 취업 준비 계획을 만드는 커리어 코치야."
+              }
+            ]
+          },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.4,
+            responseMimeType: "application/json"
+          }
+        })
+      },
+      20000
+    );
+  } catch (error) {
+    if (error.name === "AbortError" || error.code === "UND_ERR_CONNECT_TIMEOUT") {
+      return applyJobPostingInsights(getFallbackRoadmap(input), input);
     }
-  );
+    throw error;
+  }
 
   if (!response.ok) {
     const detail = await response.text();
@@ -590,7 +917,7 @@ ${input.completedTasks ? `\n[기존 완료된 학습/과제 항목 (보존 필�
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
   const parsed = parseGeminiJson(content);
 
-  return normalizeRoadmap(parsed, input);
+  return applyJobPostingInsights(normalizeRoadmap(parsed, input), input);
 }
 
 app.get("/api/config", (req, res) => {
@@ -614,23 +941,27 @@ app.post("/api/generate-roadmap", async (req, res) => {
       level: req.body.level.trim(),
       targetPeriod: String(req.body.targetPeriod || "").trim(),
       certifications: String(req.body.certifications || "").trim(),
-      completedTasks: req.body.completedTasks || null
+      completedTasks: req.body.completedTasks || null,
+      jobPostings: []
     };
+    try {
+      const postingResult = await fetchWork24JobPostings(input, { display: 8 });
+      input.jobPostings = postingResult.postings || [];
+    } catch (postingError) {
+      input.jobPostingError = postingError.message;
+    }
+
     const roadmap = await generateWithGemini(input);
 
-    const relevantCerts = Object.keys(CERT_SCHEDULES).filter(cert => 
-      (input.certifications && input.certifications.includes(cert)) || 
-      (input.jobRole && input.jobRole.includes(cert)) ||
-      (roadmap.certifications && roadmap.certifications.includes(cert)) ||
-      JSON.stringify(roadmap).includes(cert)
-    );
-    
-    const certSchedules = relevantCerts.map(cert => ({
-      name: cert,
-      schedule: CERT_SCHEDULES[cert]
-    }));
+    const certSchedules = buildCertSchedulesFromRoadmap(roadmap, input);
+    roadmap.certSchedules = certSchedules;
 
-    return res.json({ roadmap, certSchedules });
+    return res.json({
+      roadmap,
+      certSchedules,
+      jobPostings: input.jobPostings,
+      jobPostingError: input.jobPostingError || ""
+    });
   } catch (err) {
     return res.status(500).json({
       message: "로드맵 생성 중 오류가 발생했습니다.",
@@ -671,6 +1002,37 @@ app.post("/api/suggest-skills", async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       message: "추천 역량을 불러오는 중 오류가 발생했습니다.",
+      detail: err.message
+    });
+  }
+});
+
+app.post("/api/job-postings", async (req, res) => {
+  const company = String(req.body.company || "").trim();
+  const jobRole = String(req.body.jobRole || "").trim();
+
+  if (!company && !jobRole) {
+    return res.status(400).json({ message: "목표 기업 또는 희망 직무가 필요합니다." });
+  }
+
+  try {
+    const result = await fetchWork24JobPostings(
+      {
+        company,
+        jobRole,
+        skills: String(req.body.skills || "").trim(),
+        certifications: String(req.body.certifications || "").trim()
+      },
+      {
+        display: Number(req.body.display || 10),
+        forceRefresh: Boolean(req.body.forceRefresh)
+      }
+    );
+
+    return res.json(result);
+  } catch (err) {
+    return res.status(500).json({
+      message: "채용공고를 불러오는 중 오류가 발생했습니다.",
       detail: err.message
     });
   }
