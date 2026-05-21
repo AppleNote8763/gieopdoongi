@@ -191,13 +191,18 @@
                   autocomplete="off"
                   style="margin-top: 8px;"
                 />
-                <input
-                  type="date"
-                  id="targetDateInput"
-                  class="hidden compact"
-                  style="margin-top: 8px;"
-                />
+                <div id="targetDateRange" class="hidden date-range-fields">
+                  <div>
+                    <span>시작 날짜</span>
+                    <input type="date" id="targetStartDateInput" class="compact" />
+                  </div>
+                  <div>
+                    <span>목표 날짜</span>
+                    <input type="date" id="targetEndDateInput" class="compact" />
+                  </div>
+                </div>
                 <small class="helper-text">선택한 기간에 맞추어 주차별 실행 과제가 설계됩니다.</small>
+                <small class="error-text"></small>
               </label>
 
               <label class="field">
@@ -400,8 +405,17 @@
                 <input type="text" id="customNewTargetPeriod" class="compact" placeholder="예: 2주, 45일" />
               </label>
               <label class="field hidden" id="newTargetDateLabel">
-                <span>목표 날짜 선택</span>
-                <input type="date" id="newTargetDateInput" class="compact" />
+                <span>기간 선택</span>
+                <div class="date-range-fields">
+                  <div>
+                    <span>시작 날짜</span>
+                    <input type="date" id="newTargetStartDateInput" class="compact" />
+                  </div>
+                  <div>
+                    <span>목표 날짜</span>
+                    <input type="date" id="newTargetEndDateInput" class="compact" />
+                  </div>
+                </div>
               </label>
               <div class="button-row">
                 <button class="primary-button compact" id="submitRecalcBtn" type="button">재조정 시작</button>
@@ -417,8 +431,8 @@
                 <h2>학습 체크리스트</h2>
               </div>
               <small class="helper-text">
-                <span class="desktop-only">드래그하여 우선순위 변경</span>
-                <span class="mobile-only">길게 눌러 순서 이동</span>
+                <span class="desktop-only">드래그로 우선순위를 바꾸고, 각 일정 기간은 직접 수정할 수 있습니다.</span>
+                <span class="mobile-only">우선순위와 일정 기간을 직접 조정할 수 있습니다.</span>
               </small>
             </div>
             <div class="checklist" id="checklist"></div>

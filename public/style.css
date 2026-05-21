@@ -365,6 +365,23 @@ textarea {
   background-color: #fef2f2;
 }
 
+.date-range-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.date-range-fields > div {
+  display: grid;
+  gap: 6px;
+}
+
+.date-range-fields span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .error-text {
   min-height: 18px;
   color: #ef4444;
@@ -1242,7 +1259,7 @@ ol li {
   opacity: 0.8;
 }
 
-.check-item input {
+.check-item > input[type="checkbox"] {
   width: 18px;
   height: 18px;
   margin-top: 3px;
@@ -1277,6 +1294,38 @@ ol li {
   background: #f1f5f9;
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+.duration-edit {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.check-meta .duration-edit span {
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.duration-edit input {
+  width: 84px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--ink);
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.duration-edit input:focus {
+  border-color: var(--primary);
+  outline: 3px solid rgba(99, 102, 241, 0.16);
 }
 
 .check-meta .priority-badge {
@@ -1379,6 +1428,7 @@ ol li {
   .level-options,
   .button-row,
   .skill-suggestions,
+  .date-range-fields,
   .custom-checklist-grid {
     grid-template-columns: 1fr;
   }

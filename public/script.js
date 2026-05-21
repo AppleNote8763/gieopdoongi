@@ -95,11 +95,123 @@ const fields = {
   skills: document.querySelector("#skills"),
   targetPeriod: document.querySelector("#targetPeriod"),
   customTargetPeriod: document.querySelector("#customTargetPeriod"),
-  targetDateInput: document.querySelector("#targetDateInput"),
+  targetDateRange: document.querySelector("#targetDateRange"),
+  targetStartDateInput: document.querySelector("#targetStartDateInput"),
+  targetEndDateInput: document.querySelector("#targetEndDateInput"),
   certifications: document.querySelector("#certifications"),
   firstAction: document.querySelector("#firstAction"),
   portfolioDirection: document.querySelector("#portfolioDirection")
 };
+
+function todayDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDatePeriod(period, fallbackStartDate = new Date()) {
+  const value = String(period || "");
+  if (!value.startsWith("date:")) {
+    return null;
+  }
+
+  const [, firstDate, secondDate] = value.split(":");
+  const startValue = secondDate ? firstDate : new Date(fallbackStartDate).toISOString().slice(0, 10);
+  const endValue = secondDate || firstDate;
+  const startDate = new Date(`${startValue}T00:00:00`);
+  const endDate = new Date(`${endValue}T00:00:00`);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+
+  return {
+    startValue,
+    endValue,
+    startDate,
+    endDate,
+    days: Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)))
+  };
+}
+
+function openDatePicker(input) {
+  if (!input) {
+    return;
+  }
+
+  input.focus();
+  if (typeof input.showPicker === "function") {
+    try {
+      input.showPicker();
+    } catch (_error) {
+      // Some browsers only allow the picker from direct pointer/keyboard activation.
+    }
+  }
+}
+
+function syncDateRangeMin(startInput, endInput) {
+  if (!startInput || !endInput) {
+    return;
+  }
+
+  endInput.min = startInput.value || "";
+  if (startInput.value && endInput.value && endInput.value < startInput.value) {
+    endInput.value = "";
+  }
+}
+
+function attachPlanDatesToRoadmap() {
+  if (!state.roadmap) {
+    return;
+  }
+
+  const datePeriod = parseDatePeriod(state.goal?.targetPeriod, state.goal?.createdAt);
+  if (datePeriod) {
+    state.goal.createdAt = `${datePeriod.startValue}T00:00:00.000Z`;
+    state.roadmap.planStartDate = datePeriod.startValue;
+    state.roadmap.planEndDate = datePeriod.endValue;
+    state.roadmap.targetPeriod = state.goal.targetPeriod;
+  }
+}
+
+function formatChecklistDuration(days) {
+  if (days <= 1) return "1일";
+  if (days <= 3) return `${days}일`;
+  if (days <= 6) return `${days}일`;
+  const weeks = Math.max(1, Math.round(days / 7));
+  return weeks === 1 ? "1주" : `${weeks}주`;
+}
+
+function estimateChecklistDuration(index, totalItems) {
+  const totalDays = getTargetDays(state.goal?.targetPeriod || state.roadmap?.targetPeriod || state.roadmap?.estimatedPeriod);
+  const baseDays = Math.max(1, Math.round(totalDays / Math.max(1, totalItems)));
+  const weightPattern = [0.45, 0.75, 1, 1.25, 1.6];
+  const weight = weightPattern[index % weightPattern.length];
+  return formatChecklistDuration(Math.max(1, Math.round(baseDays * weight)));
+}
+
+function hydrateChecklistDurations() {
+  const checklist = state.roadmap?.checklist || [];
+  if (checklist.length === 0) {
+    return;
+  }
+
+  const editableDurations = checklist
+    .filter((item) => !item.durationEdited)
+    .map((item) => String(item.duration || "").trim())
+    .filter(Boolean);
+  const shouldRebalance =
+    editableDurations.length === 0 ||
+    new Set(editableDurations).size === 1 && ["3-5일", "기간 미정"].includes(editableDurations[0]);
+
+  checklist.forEach((item, index) => {
+    if (!item.durationEdited && (!item.duration || shouldRebalance)) {
+      item.duration = estimateChecklistDuration(index, checklist.length);
+    }
+  });
+}
 
 function showPanel(name) {
   // 비로그인 사용자도 목표 설정과 로드맵 생성 결과는 볼 수 있고, 저장/진행 관리는 로그인 후 사용합니다.
@@ -147,14 +259,15 @@ function collectGoal() {
   const customJobRole = fields.customJobRole.value.trim();
   const targetPeriod = fields.targetPeriod.value;
   const customTargetPeriod = fields.customTargetPeriod.value.trim();
-  const targetDateInput = fields.targetDateInput.value;
+  const targetStartDateInput = fields.targetStartDateInput.value;
+  const targetEndDateInput = fields.targetEndDateInput.value;
   const selectedSkills = getSelectedSkills();
   
   let finalTargetPeriod = targetPeriod;
   if (targetPeriod === "custom") {
     finalTargetPeriod = customTargetPeriod;
-  } else if (targetPeriod === "date" && targetDateInput) {
-    finalTargetPeriod = "date:" + targetDateInput;
+  } else if (targetPeriod === "date" && targetStartDateInput && targetEndDateInput) {
+    finalTargetPeriod = `date:${targetStartDateInput}:${targetEndDateInput}`;
   }
 
   return {
@@ -172,17 +285,29 @@ function setFieldError(fieldName, message) {
   const wrapper = input.closest(".field");
   const error = wrapper.querySelector(".error-text");
   wrapper.classList.toggle("invalid", Boolean(message));
-  error.textContent = message || "";
+  if (error) {
+    error.textContent = message || "";
+  }
 }
 
 function validateGoal(showErrors = false) {
   const goal = collectGoal();
+  let targetPeriodError = goal.targetPeriod ? "" : "희망 준비 기간을 입력해주세요.";
+  if (
+    fields.targetPeriod.value === "date" &&
+    fields.targetStartDateInput.value &&
+    fields.targetEndDateInput.value &&
+    fields.targetEndDateInput.value < fields.targetStartDateInput.value
+  ) {
+    targetPeriodError = "목표 날짜는 시작 날짜 이후로 선택해주세요.";
+  }
+
   const errors = {
     company: goal.company ? "" : "목표 기업을 입력해주세요.",
     jobRole: goal.jobRole ? "" : "희망 직무를 선택해주세요.",
     skills: "",
     level: goal.level ? "" : "경력 수준을 선택해주세요.",
-    targetPeriod: goal.targetPeriod ? "" : "희망 준비 기간을 입력해주세요."
+    targetPeriod: targetPeriodError
   };
 
   if (showErrors) {
@@ -555,7 +680,9 @@ async function initSupabaseAuth() {
   if (state.session) {
     const roadmaps = await loadSavedRoadmaps();
     if (roadmaps && roadmaps.length > 0) {
-      loadRoadmapFromRecord(roadmaps[0]);
+      loadRoadmapFromRecord(roadmaps[0], {
+        openProgress: !new URLSearchParams(window.location.search).has("new")
+      });
     }
   }
 
@@ -566,7 +693,9 @@ async function initSupabaseAuth() {
     if (session) {
       const roadmaps = await loadSavedRoadmaps();
       if (roadmaps && roadmaps.length > 0) {
-        loadRoadmapFromRecord(roadmaps[0]);
+        loadRoadmapFromRecord(roadmaps[0], {
+          openProgress: !new URLSearchParams(window.location.search).has("new")
+        });
       } else {
         showPanel("goal");
       }
@@ -659,7 +788,11 @@ async function generateRoadmap() {
   if (data.certSchedules) {
     state.roadmap.certSchedules = data.certSchedules;
   }
-  state.goal.createdAt = new Date().toISOString(); // new roadmap starts now
+  if (!parseDatePeriod(state.goal.targetPeriod)) {
+    state.goal.createdAt = new Date().toISOString(); // new roadmap starts now
+  }
+  attachPlanDatesToRoadmap();
+  hydrateChecklistDurations();
   renderRoadmap();
   renderProgress();
   setLoading(false);
@@ -778,13 +911,13 @@ function renderSavedRoadmaps(roadmaps) {
   });
 }
 
-function loadRoadmapFromRecord(record) {
+function loadRoadmapFromRecord(record, { openProgress = true } = {}) {
   state.goal = {
     company: record.company,
     jobRole: record.job_role,
     skills: record.skills,
     level: record.level,
-    targetPeriod: record.roadmap_result?.estimatedPeriod || "",
+    targetPeriod: record.roadmap_result?.targetPeriod || record.roadmap_result?.estimatedPeriod || "",
     certifications: record.roadmap_result?.certifications || "",
     createdAt: record.created_at
   };
@@ -811,14 +944,30 @@ function loadRoadmapFromRecord(record) {
   });
 
   if (fields.targetPeriod) {
-    const matchingOption = Array.from(fields.targetPeriod.options).find(opt => 
-      opt.value === state.goal.targetPeriod || 
-      (state.goal.targetPeriod && opt.value.includes(state.goal.targetPeriod))
-    );
-    if (matchingOption) {
-      fields.targetPeriod.value = matchingOption.value;
+    const savedDatePeriod = parseDatePeriod(record.roadmap_result?.targetPeriod, record.created_at);
+    fields.customTargetPeriod.classList.add("hidden");
+    fields.targetDateRange.classList.add("hidden");
+    fields.targetStartDateInput.value = "";
+    fields.targetEndDateInput.value = "";
+
+    if (savedDatePeriod) {
+      fields.targetPeriod.value = "date";
+      fields.targetDateRange.classList.remove("hidden");
+      fields.targetStartDateInput.value = savedDatePeriod.startValue;
+      fields.targetEndDateInput.value = savedDatePeriod.endValue;
+      syncDateRangeMin(fields.targetStartDateInput, fields.targetEndDateInput);
+      state.goal.targetPeriod = record.roadmap_result.targetPeriod;
+      state.goal.createdAt = `${savedDatePeriod.startValue}T00:00:00.000Z`;
     } else {
-      fields.targetPeriod.value = "";
+      const matchingOption = Array.from(fields.targetPeriod.options).find(opt => 
+        opt.value === state.goal.targetPeriod || 
+        (state.goal.targetPeriod && opt.value.includes(state.goal.targetPeriod))
+      );
+      if (matchingOption) {
+        fields.targetPeriod.value = matchingOption.value;
+      } else {
+        fields.targetPeriod.value = "";
+      }
     }
   }
 
@@ -830,14 +979,18 @@ function loadRoadmapFromRecord(record) {
   enableStep("progress");
   renderTargetSummary();
   renderRoadmap();
+  hydrateChecklistDurations();
   renderProgress();
   setLoading(false);
   updateAuthUI();
   
-  if (new URLSearchParams(window.location.search).has("new")) {
-    showPanel("goal");
-  } else {
+  if (openProgress) {
+    if (new URLSearchParams(window.location.search).has("new")) {
+      history.replaceState(null, "", window.location.pathname);
+    }
     showPanel("progress");
+  } else {
+    showPanel("goal");
   }
 }
 
@@ -853,6 +1006,8 @@ function calculateProgress() {
 
 function getTargetDays(periodStr) {
   const str = periodStr || "";
+  const datePeriod = parseDatePeriod(str, state.goal?.createdAt);
+  if (datePeriod) return datePeriod.days;
   if (str.includes("1개월")) return 30;
   if (str.includes("3개월")) return 90;
   if (str.includes("6개월")) return 180;
@@ -877,8 +1032,10 @@ function renderProgress() {
   document.querySelector("#progressFill").style.width = `${taskPercent}%`;
 
   // Time Progress & D-Day
-  const startDate = state.goal?.createdAt ? new Date(state.goal.createdAt) : new Date();
-  const targetDays = getTargetDays(state.goal?.targetPeriod || state.roadmap?.estimatedPeriod);
+  const storedTargetPeriod = state.goal?.targetPeriod || state.roadmap?.targetPeriod || state.roadmap?.estimatedPeriod;
+  const datePeriod = parseDatePeriod(storedTargetPeriod, state.goal?.createdAt);
+  const startDate = datePeriod?.startDate || (state.goal?.createdAt ? new Date(state.goal.createdAt) : new Date());
+  const targetDays = datePeriod?.days || getTargetDays(storedTargetPeriod);
   
   // Dashboard Header
   const jobRoleStr = state.goal?.jobRole || state.roadmap?.jobRole || "직무명 없음";
@@ -886,11 +1043,14 @@ function renderProgress() {
   if (roleEl) roleEl.textContent = `${jobRoleStr} 준비`;
   
   const endMs = startDate.getTime() + (targetDays * 24 * 60 * 60 * 1000);
-  const endDate = new Date(endMs);
+  const endDate = datePeriod?.endDate || new Date(endMs);
   const formatDt = (d) => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2, '0')}`;
   const periodEl = document.querySelector("#dashboardPeriodText");
   if (periodEl) {
-    periodEl.textContent = `${formatDt(startDate)} ~ ${formatDt(endDate)} (${state.goal?.targetPeriod || state.roadmap?.estimatedPeriod || targetDays + "일"})`;
+    const periodLabel = datePeriod
+      ? `${datePeriod.startValue} ~ ${datePeriod.endValue}`
+      : state.goal?.targetPeriod || state.roadmap?.estimatedPeriod || `${targetDays}일`;
+    periodEl.textContent = `${formatDt(startDate)} ~ ${formatDt(endDate)} (${periodLabel})`;
   }
   
   const now = new Date();
@@ -977,7 +1137,15 @@ function renderProgress() {
       </div>
       <div class="check-meta">
         <span class="priority-badge">우선순위 ${index + 1}</span>
-        <span>${item.duration || "기간 미정"}</span>
+        <label class="duration-edit">
+          <span>예상 기간</span>
+          <input
+            type="text"
+            value="${escapeHtml(item.duration || "")}"
+            placeholder="예: 2일, 1주"
+            aria-label="${escapeHtml(item.title)} 예상 기간 수정"
+          />
+        </label>
         <span class="${item.done ? "status-done" : ""}">${item.done ? "완료" : "진행 중"}</span>
       </div>
     `;
@@ -1028,7 +1196,7 @@ function renderProgress() {
     });
 
     row.addEventListener("click", async (event) => {
-      if (event.target.closest(".drag-handle")) {
+      if (event.target.closest(".drag-handle") || event.target.closest(".duration-edit")) {
         return;
       }
 
@@ -1044,6 +1212,13 @@ function renderProgress() {
       item.done = checkbox.checked;
       await persistProgress();
       renderProgress();
+    });
+
+    const durationInput = row.querySelector(".duration-edit input");
+    durationInput.addEventListener("change", async () => {
+      item.duration = durationInput.value.trim();
+      item.durationEdited = true;
+      await persistProgress();
     });
 
     checklistBox.appendChild(row);
@@ -1078,21 +1253,28 @@ on(goalForm, "change", () => validateGoal(false));
 
 on(fields.targetPeriod, "change", () => {
   fields.customTargetPeriod.classList.add("hidden");
-  fields.targetDateInput.classList.add("hidden");
+  fields.targetDateRange.classList.add("hidden");
   fields.customTargetPeriod.value = "";
-  fields.targetDateInput.value = "";
+  fields.targetStartDateInput.value = "";
+  fields.targetEndDateInput.value = "";
   
   if (fields.targetPeriod.value === "custom") {
     fields.customTargetPeriod.classList.remove("hidden");
     fields.customTargetPeriod.focus();
   } else if (fields.targetPeriod.value === "date") {
-    fields.targetDateInput.classList.remove("hidden");
-    fields.targetDateInput.focus();
+    fields.targetDateRange.classList.remove("hidden");
+    fields.targetStartDateInput.value = todayDateValue();
+    syncDateRangeMin(fields.targetStartDateInput, fields.targetEndDateInput);
+    openDatePicker(fields.targetEndDateInput);
   }
   validateGoal(false);
 });
 on(fields.customTargetPeriod, "input", () => validateGoal(false));
-on(fields.targetDateInput, "input", () => validateGoal(false));
+on(fields.targetStartDateInput, "input", () => {
+  syncDateRangeMin(fields.targetStartDateInput, fields.targetEndDateInput);
+  validateGoal(false);
+});
+on(fields.targetEndDateInput, "input", () => validateGoal(false));
 on(fields.jobRole, "change", () => {
   if (fields.jobRole.value) {
     fields.customJobRole.value = "";
@@ -1276,12 +1458,13 @@ const newCustomTargetPeriod = document.querySelector("#newCustomTargetPeriod");
 const submitRecalcBtn = document.querySelector("#submitRecalcBtn");
 const cancelRecalcBtn = document.querySelector("#cancelRecalcBtn");
 const newTargetDateLabel = document.querySelector("#newTargetDateLabel");
-const newTargetDateInput = document.querySelector("#newTargetDateInput");
+const newTargetStartDateInput = document.querySelector("#newTargetStartDateInput");
+const newTargetEndDateInput = document.querySelector("#newTargetEndDateInput");
 const customNewTargetPeriodLabel = document.querySelector("#customNewTargetPeriodLabel");
 
 if (recalcPeriodButton) {
   function syncRecalcPeriodInputs({ openPicker = false } = {}) {
-    if (!customNewTargetPeriodLabel || !newTargetDateLabel || !newTargetDateInput) {
+    if (!customNewTargetPeriodLabel || !newTargetDateLabel || !newTargetStartDateInput || !newTargetEndDateInput) {
       return;
     }
 
@@ -1298,15 +1481,12 @@ if (recalcPeriodButton) {
 
     if (newTargetPeriod.value === "date") {
       newTargetDateLabel.classList.remove("hidden");
+      if (!newTargetStartDateInput.value) {
+        newTargetStartDateInput.value = todayDateValue();
+      }
+      syncDateRangeMin(newTargetStartDateInput, newTargetEndDateInput);
       if (openPicker) {
-        newTargetDateInput.focus();
-        if (typeof newTargetDateInput.showPicker === "function") {
-          try {
-            newTargetDateInput.showPicker();
-          } catch (_error) {
-            // Some browsers only allow the picker from direct pointer/keyboard activation.
-          }
-        }
+        openDatePicker(newTargetEndDateInput);
       }
     }
   }
@@ -1324,8 +1504,13 @@ if (recalcPeriodButton) {
 
   newTargetPeriod.addEventListener("change", () => {
     newCustomTargetPeriod.value = "";
-    newTargetDateInput.value = "";
+    newTargetStartDateInput.value = "";
+    newTargetEndDateInput.value = "";
     syncRecalcPeriodInputs({ openPicker: true });
+  });
+
+  newTargetStartDateInput.addEventListener("input", () => {
+    syncDateRangeMin(newTargetStartDateInput, newTargetEndDateInput);
   });
 
   submitRecalcBtn.addEventListener("click", async () => {
@@ -1337,21 +1522,31 @@ if (recalcPeriodButton) {
         return;
       }
     } else if (periodVal === "date") {
-      if (!newTargetDateInput.value) {
-        alert("목표 날짜를 선택해주세요.");
+      if (!newTargetStartDateInput.value || !newTargetEndDateInput.value) {
+        alert("시작 날짜와 목표 날짜를 모두 선택해주세요.");
         return;
       }
-      periodVal = "date:" + newTargetDateInput.value;
+      if (newTargetEndDateInput.value < newTargetStartDateInput.value) {
+        alert("목표 날짜는 시작 날짜 이후로 선택해주세요.");
+        return;
+      }
+      periodVal = `date:${newTargetStartDateInput.value}:${newTargetEndDateInput.value}`;
     }
 
     state.goal.targetPeriod = periodVal;
-    state.goal.createdAt = new Date().toISOString();
+    state.goal.createdAt = newTargetPeriod.value === "date"
+      ? `${newTargetStartDateInput.value}T00:00:00.000Z`
+      : new Date().toISOString();
     
     fields.targetPeriod.value = newTargetPeriod.value;
+    fields.customTargetPeriod.classList.toggle("hidden", newTargetPeriod.value !== "custom");
+    fields.targetDateRange.classList.toggle("hidden", newTargetPeriod.value !== "date");
     if (newTargetPeriod.value === "custom") {
       fields.customTargetPeriod.value = newCustomTargetPeriod.value;
     } else if (newTargetPeriod.value === "date") {
-      fields.targetDateInput.value = newTargetDateInput.value;
+      fields.targetStartDateInput.value = newTargetStartDateInput.value;
+      fields.targetEndDateInput.value = newTargetEndDateInput.value;
+      syncDateRangeMin(fields.targetStartDateInput, fields.targetEndDateInput);
     }
     
     const completedTasks = (state.roadmap?.checklist || []).filter(item => item.done);
@@ -1377,6 +1572,8 @@ if (recalcPeriodButton) {
       if (data.certSchedules) {
         state.roadmap.certSchedules = data.certSchedules;
       }
+      attachPlanDatesToRoadmap();
+      hydrateChecklistDurations();
       renderRoadmap();
       renderProgress();
       

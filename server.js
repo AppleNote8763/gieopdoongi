@@ -381,7 +381,11 @@ function getFallbackRoadmap({ company, jobRole, skills, level, targetPeriod, cer
   let weeksCount = 4;
 
   if (targetPeriod) {
-    if (targetPeriod.includes("1개월") || targetPeriod.includes("4주")) {
+    const dateRange = parseTargetDateRange(targetPeriod);
+    if (dateRange) {
+      weeksCount = Math.max(4, Math.min(16, Math.ceil(dateRange.days / 7)));
+      period = `${weeksCount}주 (${dateRange.startValue} ~ ${dateRange.endValue})`;
+    } else if (targetPeriod.includes("1개월") || targetPeriod.includes("4주")) {
       weeksCount = 4;
       period = "4주 (1개월)";
     } else if (targetPeriod.includes("3개월") || targetPeriod.includes("12주")) {
@@ -486,7 +490,7 @@ function getFallbackRoadmap({ company, jobRole, skills, level, targetPeriod, cer
     ],
     firstAction:
       `오늘 ${company}의 ${jobRole} 채용 공고 1개를 찾아 필수 기술 5개를 정리하세요.`,
-    checklist: checklist.slice(0, 10),
+    checklist: normalizeChecklistDurations(checklist.slice(0, 10), targetPeriod),
     estimatedPeriod: period
   };
 }
@@ -504,7 +508,10 @@ function normalizeRoadmap(parsed, input) {
       ? parsed.interviewItems
       : fallback.interviewItems,
     firstAction: parsed.firstAction || fallback.firstAction,
-    checklist: Array.isArray(parsed.checklist) ? parsed.checklist : fallback.checklist,
+    checklist: normalizeChecklistDurations(
+      Array.isArray(parsed.checklist) ? parsed.checklist : fallback.checklist,
+      input.targetPeriod
+    ),
     estimatedPeriod: parsed.estimatedPeriod || fallback.estimatedPeriod
   };
 }
@@ -657,6 +664,75 @@ function getFallbackSkills(company, jobRole) {
     "면접 답변 정리",
     "목표 산업 이해"
   ];
+}
+
+function parseTargetDateRange(targetPeriod) {
+  const value = String(targetPeriod || "");
+  if (!value.startsWith("date:")) {
+    return null;
+  }
+
+  const [, firstDate, secondDate] = value.split(":");
+  const startValue = secondDate ? firstDate : new Date().toISOString().slice(0, 10);
+  const endValue = secondDate || firstDate;
+  const startDate = new Date(`${startValue}T00:00:00`);
+  const endDate = new Date(`${endValue}T00:00:00`);
+
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return null;
+  }
+
+  return {
+    startValue,
+    endValue,
+    days: Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)))
+  };
+}
+
+function formatChecklistDuration(days) {
+  if (days <= 1) return "1일";
+  if (days <= 6) return `${days}일`;
+
+  const weeks = Math.max(1, Math.round(days / 7));
+  return weeks === 1 ? "1주" : `${weeks}주`;
+}
+
+function estimateChecklistDuration(index, totalItems, targetPeriod) {
+  const dateRange = parseTargetDateRange(targetPeriod);
+  let totalDays = dateRange?.days || 28;
+
+  if (!dateRange && targetPeriod) {
+    if (targetPeriod.includes("3개월") || targetPeriod.includes("12주")) {
+      totalDays = 84;
+    } else if (targetPeriod.includes("6개월") || targetPeriod.includes("24주")) {
+      totalDays = 168;
+    } else if (targetPeriod.includes("12개월") || targetPeriod.includes("1년") || targetPeriod.includes("52주")) {
+      totalDays = 365;
+    }
+  }
+
+  const baseDays = Math.max(1, Math.round(totalDays / Math.max(1, totalItems)));
+  const weightPattern = [0.45, 0.75, 1, 1.25, 1.6];
+  const weight = weightPattern[index % weightPattern.length];
+
+  return formatChecklistDuration(Math.max(1, Math.round(baseDays * weight)));
+}
+
+function normalizeChecklistDurations(checklist, targetPeriod) {
+  const items = Array.isArray(checklist) ? checklist : [];
+  const durations = items
+    .map((item) => String(item?.duration || "").trim())
+    .filter(Boolean);
+  const shouldRebalance =
+    durations.length === 0 ||
+    (new Set(durations).size === 1 && ["3-5일", "기간 미정"].includes(durations[0]));
+
+  return items.map((item, index) => ({
+    ...item,
+    duration: shouldRebalance || !item.duration
+      ? estimateChecklistDuration(index, items.length, targetPeriod)
+      : item.duration
+  }));
 }
 
 function normalizeRoles(parsed, company) {
@@ -829,6 +905,11 @@ async function generateWithGemini(input) {
     return applyJobPostingInsights(getFallbackRoadmap(input), input);
   }
 
+  const dateRange = parseTargetDateRange(input.targetPeriod);
+  const targetPeriodForPrompt = dateRange
+    ? `${dateRange.startValue}부터 ${dateRange.endValue}까지 총 ${dateRange.days}일`
+    : input.targetPeriod || "AI 추천";
+
   const relevantCerts = Object.keys(CERT_SCHEDULES).filter(cert => 
     (input.certifications && input.certifications.includes(cert)) || 
     (input.jobRole && input.jobRole.includes(cert))
@@ -845,7 +926,7 @@ async function generateWithGemini(input) {
 희망 직무: ${input.jobRole}
 현재 보유 기술/역량: ${input.skills || "입력하지 않음"}
 경력 수준: ${input.level}
-희망 준비 기간: ${input.targetPeriod || "AI 추천"}
+희망 준비 기간: ${targetPeriodForPrompt}
 목표 자격증: ${input.certifications || "AI 추천"}
 ${certSchedulesText}
 ${input.jobPostings && input.jobPostings.length > 0 ? `\n[고용24 최신 관련 채용공고 분석]\n${input.jobPostings.slice(0, 5).map((posting) => {
@@ -870,6 +951,7 @@ ${input.completedTasks ? `\n[기존 완료된 학습/과제 항목 (보존 필�
 3. 체크리스트 연동:
    - 'weeks'의 세부 태스크와 연동되는 'checklist'를 구체적으로 만들어줘.
    - 각 체크리스트 아이템은 고유한 id("task-1", "task-2", ...)를 가져야 하며, 실제 실행 가능한 상세한 액션 아이템이어야 해.
+   - duration은 전체 일수를 항목 수로 단순히 나눈 고정값이 아니라, 작업 난이도와 성격에 따라 "1일", "3일", "1주", "2주"처럼 서로 다르게 산정해줘.
 
 반드시 다음 JSON 구조를 엄격하게 지켜서 JSON 마크다운 기호 없이 순수 JSON 텍스트 또는 JSON 블록으로만 반환해줘.
 {
