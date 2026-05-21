@@ -12,7 +12,7 @@
   </head>
   <body>
     <header class="app-header">
-      <a href="/" class="logo-link" aria-label="홈으로 가기 (초기화)">
+      <a href="/?new=1" class="logo-link" aria-label="홈으로 가기 (초기화)">
         <p class="eyebrow">기업둥이</p>
         <h1>AI 취업 준비 플래너</h1>
       </a>
@@ -25,9 +25,9 @@
         </nav>
 
         <div class="user-box">
-          <span id="userEmail">로그인하지 않음</span>
-          <button class="text-button" id="showLoginButton" type="button">로그인</button>
-          <button class="text-button" id="showSignupButton" type="button">회원가입</button>
+          <span id="userEmail"></span>
+          <button class="outline-button" id="showLoginButton" type="button">로그인</button>
+          <button class="primary-button" id="showSignupButton" type="button">회원가입</button>
           <button class="text-button hidden" id="logoutButton" type="button">로그아웃</button>
         </div>
       </div>
@@ -173,15 +173,23 @@
               </label>
 
               <label class="field">
-                <span>희망 준비 기간</span>
-                <select id="targetPeriod" name="targetPeriod">
-                  <option value="">AI 추천 (기업·직무 난이도 분석)</option>
+                <span>희망 준비 기간 (필수)</span>
+                <select id="targetPeriod" name="targetPeriod" required>
+                  <option value="" disabled selected>준비 기간을 선택하세요</option>
                   <option value="1개월">1개월 (4주)</option>
                   <option value="3개월">3개월 (8~12주)</option>
                   <option value="6개월">6개월 (24주)</option>
-                  <option value="12개월">1년 (52주)</option>
+                  <option value="1년">1년 (52주)</option>
+                  <option value="custom">직접 입력</option>
                 </select>
-                <small class="helper-text">목표 기간에 딱 맞추어 학습 주차와 세부 실행 과제를 설계합니다.</small>
+                <input
+                  type="text"
+                  id="customTargetPeriod"
+                  class="hidden compact"
+                  placeholder="예: 2개월, 8주 등 직접 입력"
+                  autocomplete="off"
+                />
+                <small class="helper-text">선택한 기간에 맞추어 주차별 실행 과제가 설계됩니다.</small>
               </label>
 
               <label class="field">
@@ -314,25 +322,95 @@
               <button class="primary-button" id="progressSaveButton" type="button" style="width: 100%;">이 로드맵 저장하기</button>
               <p class="helper-text" id="progressSaveStatus" style="margin-top: 8px; text-align: center; font-size: 13px;"></p>
             </div>
-            <div class="progress-card">
+            <div class="d-day-banner" style="background: var(--primary-soft); color: var(--primary); padding: 16px; border-radius: var(--radius); margin-bottom: 16px; text-align: center;">
+              <h3 style="font-size: 24px; font-weight: 800; margin-bottom: 4px;" id="dDayBadge">D-??</h3>
+              <p style="font-size: 13px; font-weight: 600;" id="dDayText">목표일까지 남은 시간 계산 중...</p>
+            </div>
+
+            <div class="progress-card" style="margin-bottom: 12px;">
               <div>
-                <span>전체 진행률</span>
+                <span>업무 진행률</span>
                 <strong id="progressPercent">0%</strong>
                 <p id="progressCount">0 / 0 완료</p>
               </div>
-              <div class="progress-bar" aria-label="전체 진행률">
+              <div class="progress-bar" aria-label="업무 진행률">
                 <span id="progressFill"></span>
               </div>
             </div>
+            
+            <div class="progress-card" style="margin-bottom: 16px;">
+              <div>
+                <span>시간 진행률</span>
+                <strong id="timeProgressPercent">0%</strong>
+                <p id="timeProgressCount">0일 지남</p>
+              </div>
+              <div class="progress-bar" aria-label="시간 진행률">
+                <span id="timeProgressFill" style="background: var(--muted);"></span>
+              </div>
+            </div>
             <p class="helper-text" id="remainingText"></p>
+
+            <div id="certScheduleContainer" class="hidden" style="margin-bottom: 16px; padding: 16px; border: 1px solid var(--primary); border-radius: var(--radius); background: #ffffff;">
+              <h4 style="font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 8px;">🔥 다가오는 자격증 일정</h4>
+              <ul id="certScheduleList" style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--ink);">
+              </ul>
+            </div>
+            
+            <div style="margin-top: 16px;" id="recalcPeriodContainer">
+              <button class="outline-button" id="recalcPeriodButton" type="button" style="width: 100%; font-size: 13px;">📅 기간 재조정</button>
+            </div>
+            
+            <div id="recalcPeriodForm" class="hidden" style="margin-top: 12px; padding: 16px; background: var(--page); border: 1px solid var(--line); border-radius: var(--radius-sm);">
+              <label class="field" style="margin-bottom: 12px;">
+                <span style="font-size: 13px;">새로운 준비 기간</span>
+                <select id="newTargetPeriod" class="compact">
+                  <option value="1개월">1개월 (4주)</option>
+                  <option value="3개월" selected>3개월 (8~12주)</option>
+                  <option value="6개월">6개월 (24주)</option>
+                  <option value="1년">1년 (52주)</option>
+                  <option value="custom">직접 입력</option>
+                </select>
+                <input type="text" id="newCustomTargetPeriod" class="hidden compact" placeholder="직접 입력 (예: 2주)" style="margin-top: 8px;" />
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <button class="primary-button compact" id="submitRecalcBtn" type="button" style="flex: 1; padding: 8px;">재조정 시작</button>
+                <button class="text-button compact" id="cancelRecalcBtn" type="button">취소</button>
+              </div>
+            </div>
           </aside>
 
           <div class="content-card">
-            <div class="section-heading compact">
-              <p class="eyebrow">Checklist</p>
-              <h2>학습 체크리스트</h2>
+            <div class="section-heading compact" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <p class="eyebrow">Checklist</p>
+                <h2>학습 체크리스트</h2>
+              </div>
+              <small class="helper-text" style="display: flex; align-items: center; gap: 4px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16l5 5 5-5M7 8l5-5 5 5M12 2v20"/></svg>
+                <span class="desktop-only">드래그하여 우선순위 변경</span>
+                <span class="mobile-only">길게 눌러 순서 이동</span>
+              </small>
             </div>
             <div class="checklist" id="checklist"></div>
+            
+            <div class="custom-checklist-form" style="margin-top: 32px; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--page);">
+              <h3 style="font-size: 16px; margin-bottom: 16px; color: var(--ink);">+ 나만의 항목 추가</h3>
+              <div class="field" style="margin-bottom: 12px;">
+                <input type="text" id="customCheckItemTitle" placeholder="예: 자격증 시험 접수, 면접 스터디 (필수)" class="compact" />
+              </div>
+              <div class="field" style="margin-bottom: 12px;">
+                <input type="text" id="customCheckItemDesc" placeholder="설명 및 팁 (선택)" class="compact" />
+              </div>
+              <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <select id="customCheckItemPriority" class="compact">
+                  <option value="상">우선순위: 상</option>
+                  <option value="중" selected>우선순위: 중</option>
+                  <option value="하">우선순위: 하</option>
+                </select>
+                <input type="text" id="customCheckItemPeriod" placeholder="예상 기간 (예: 1주)" class="compact" />
+              </div>
+              <button class="secondary-button" id="addCustomCheckItemBtn" type="button" style="width: 100%;">항목 추가하기</button>
+            </div>
           </div>
         </div>
       </section>

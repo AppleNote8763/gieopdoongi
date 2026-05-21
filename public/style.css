@@ -100,14 +100,10 @@ textarea {
 .user-box {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 500;
-  background: rgba(241, 245, 249, 0.8);
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .user-box span {
@@ -513,6 +509,7 @@ textarea {
 /* Premium Button Styling with modern micro-interactions */
 .primary-button,
 .secondary-button,
+.outline-button,
 .text-button {
   border: 0;
   border-radius: var(--radius-sm);
@@ -524,6 +521,7 @@ textarea {
   justify-content: center;
   gap: 8px;
   font-size: 14px;
+  white-space: nowrap;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -561,6 +559,20 @@ textarea {
   background: #eef2ff;
   border-color: var(--primary);
   transform: translateY(-1px);
+}
+
+.outline-button {
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.outline-button:hover {
+  background: rgba(241, 245, 249, 0.8);
+  border-color: var(--muted);
 }
 
 .text-button {
@@ -908,16 +920,18 @@ ol li {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--line);
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
   border-radius: 6px;
   color: var(--muted);
-  background: #ffffff;
+  background: transparent;
   cursor: grab;
-  line-height: 1;
-  font-size: 13px;
   transition: all 0.2s ease;
+}
+
+.drag-handle svg {
+  pointer-events: none;
 }
 
 .drag-handle:hover {
@@ -1026,6 +1040,15 @@ ol li {
 
   .user-box {
     justify-content: center;
+    width: 100%;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+  
+  .user-box button {
+    flex: 1;
   }
 
   .goal-layout,
@@ -1084,4 +1107,22 @@ ol li {
     flex-wrap: wrap;
     margin-top: 8px;
   }
+
+  /* Prevent iOS zoom and increase touch target */
+  input[type="text"],
+  input[type="password"],
+  input[type="email"],
+  select,
+  textarea {
+    font-size: 16px !important;
+    padding: 12px 14px;
+  }
+}
+
+.desktop-only { display: inline-block; }
+.mobile-only { display: none; }
+
+@media (max-width: 640px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: inline-block !important; }
 }

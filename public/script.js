@@ -52,12 +52,19 @@ const fields = {
   customJobRole: document.querySelector("#customJobRole"),
   skills: document.querySelector("#skills"),
   targetPeriod: document.querySelector("#targetPeriod"),
+  customTargetPeriod: document.querySelector("#customTargetPeriod"),
   certifications: document.querySelector("#certifications"),
   firstAction: document.querySelector("#firstAction"),
   portfolioDirection: document.querySelector("#portfolioDirection")
 };
 
 function showPanel(name) {
+  // 비로그인 사용자의 보호된 페이지(로드맵 생성 결과, 진행 관리) 접근 차단
+  const protectedPanels = ["roadmap", "progress"];
+  if (!state.session && protectedPanels.includes(name)) {
+    name = "login";
+  }
+
   Object.entries(panels).forEach(([panelName, panel]) => {
     panel.classList.toggle("active", panelName === name);
   });
@@ -94,13 +101,18 @@ function getSelectedSkills() {
 function collectGoal() {
   const customJobRole = fields.customJobRole.value.trim();
   const selectedSkills = getSelectedSkills();
+  const customTargetPeriod = fields.customTargetPeriod.value.trim();
+  let finalTargetPeriod = fields.targetPeriod.value;
+  if (finalTargetPeriod === "custom") {
+    finalTargetPeriod = customTargetPeriod;
+  }
 
   return {
     company: fields.company.value.trim(),
     jobRole: customJobRole || fields.jobRole.value.trim(),
     skills: selectedSkills.join(", "),
     level: getSelectedLevel(),
-    targetPeriod: fields.targetPeriod.value,
+    targetPeriod: finalTargetPeriod,
     certifications: fields.certifications.value.trim()
   };
 }
@@ -119,14 +131,15 @@ function validateGoal(showErrors = false) {
     company: goal.company ? "" : "목표 기업을 입력해주세요.",
     jobRole: goal.jobRole ? "" : "희망 직무를 선택해주세요.",
     skills: "",
-    level: goal.level ? "" : "경력 수준을 선택해주세요."
+    level: goal.level ? "" : "경력 수준을 선택해주세요.",
+    targetPeriod: goal.targetPeriod ? "" : "희망 준비 기간을 입력해주세요."
   };
 
   if (showErrors) {
     setFieldError("company", errors.company);
     setFieldError("jobRole", errors.jobRole);
-    setFieldError("skills", errors.skills);
     document.querySelector("#levelError").textContent = errors.level;
+    setFieldError("targetPeriod", errors.targetPeriod);
   }
 
   const isValid = Object.values(errors).every((message) => !message);
@@ -306,7 +319,7 @@ function getAuthHeaders() {
 
 function updateAuthUI() {
   const isLoggedIn = Boolean(state.session);
-  const email = state.session?.user?.email || "로그인하지 않음";
+  const email = state.session?.user?.email || "";
 
   const userEmailEl = document.querySelector("#userEmail");
   userEmailEl.textContent = email;
@@ -483,6 +496,30 @@ async function signOut() {
   }
 
   await state.supabase.auth.signOut();
+
+  // 상태 완전 초기화
+  state.session = null;
+  state.roadmap = null;
+  state.savedRoadmapId = null;
+  state.goal = {};
+
+  // 폼 및 화면 초기화
+  goalForm.reset();
+  fields.customJobRole.value = "";
+  document.querySelector('#roadmapContent').innerHTML = "";
+  document.querySelector('#checklistBox').innerHTML = "";
+
+  // 스토리지 완벽 초기화
+  localStorage.clear();
+  sessionStorage.clear();
+
+  // 상단 스텝 탭 비활성화
+  document.querySelector('[data-step-button="roadmap"]').disabled = true;
+  document.querySelector('[data-step-button="progress"]').disabled = true;
+
+  // 뒤로가기 방지 및 로그인 패널로 강제 이동
+  history.replaceState(null, '', '/');
+  showPanel("login");
 }
 
 async function generateRoadmap() {
@@ -506,6 +543,10 @@ async function generateRoadmap() {
   }
 
   state.roadmap = data.roadmap;
+  if (data.certSchedules) {
+    state.roadmap.certSchedules = data.certSchedules;
+  }
+  state.goal.createdAt = new Date().toISOString(); // new roadmap starts now
   renderRoadmap();
   renderProgress();
   setLoading(false);
@@ -631,7 +672,8 @@ function loadRoadmapFromRecord(record) {
     skills: record.skills,
     level: record.level,
     targetPeriod: record.roadmap_result?.estimatedPeriod || "",
-    certifications: record.roadmap_result?.certifications || ""
+    certifications: record.roadmap_result?.certifications || "",
+    createdAt: record.created_at
   };
   state.roadmap = record.roadmap_result;
   state.savedRoadmapId = record.id;
@@ -677,7 +719,12 @@ function loadRoadmapFromRecord(record) {
   renderProgress();
   setLoading(false);
   updateAuthUI();
-  showPanel("progress");
+  
+  if (new URLSearchParams(window.location.search).has("new")) {
+    showPanel("goal");
+  } else {
+    showPanel("progress");
+  }
 }
 
 function calculateProgress() {
@@ -690,19 +737,94 @@ function calculateProgress() {
   return Math.round((doneCount / checklist.length) * 100);
 }
 
+function getTargetDays(periodStr) {
+  const str = periodStr || "";
+  if (str.includes("1개월")) return 30;
+  if (str.includes("3개월")) return 90;
+  if (str.includes("6개월")) return 180;
+  if (str.includes("1년")) return 365;
+  const weeks = str.match(/(\d+)주/);
+  if (weeks) return parseInt(weeks[1]) * 7;
+  const months = str.match(/(\d+)개월/);
+  if (months) return parseInt(months[1]) * 30;
+  const days = str.match(/(\d+)일/);
+  if (days) return parseInt(days[1]);
+  return 90;
+}
+
 function renderProgress() {
   const checklist = state.roadmap?.checklist || [];
   const doneCount = checklist.filter((item) => item.done).length;
-  const percent = calculateProgress();
+  const taskPercent = calculateProgress();
 
-  document.querySelector("#progressPercent").textContent = `${percent}%`;
-  document.querySelector("#progressCount").textContent =
-    `${doneCount} / ${checklist.length} 완료`;
-  document.querySelector("#progressFill").style.width = `${percent}%`;
+  // Task Progress
+  document.querySelector("#progressPercent").textContent = `${taskPercent}%`;
+  document.querySelector("#progressCount").textContent = `${doneCount} / ${checklist.length} 완료`;
+  document.querySelector("#progressFill").style.width = `${taskPercent}%`;
+
+  // Time Progress & D-Day
+  const startDate = state.goal?.createdAt ? new Date(state.goal.createdAt) : new Date();
+  const targetDays = getTargetDays(state.goal?.targetPeriod || state.roadmap?.estimatedPeriod);
+  
+  const now = new Date();
+  const elapsedMs = now - startDate;
+  const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+  const remainingDays = Math.max(0, targetDays - elapsedDays);
+  
+  let timePercent = Math.round((elapsedDays / targetDays) * 100);
+  if (timePercent > 100) timePercent = 100;
+
+  document.querySelector("#timeProgressPercent").textContent = `${timePercent}%`;
+  document.querySelector("#timeProgressCount").textContent = `${elapsedDays}일 지남 / 총 ${targetDays}일`;
+  document.querySelector("#timeProgressFill").style.width = `${timePercent}%`;
+  
+  // D-Day Badge
+  const dDayBadge = document.querySelector("#dDayBadge");
+  const dDayText = document.querySelector("#dDayText");
+  const dDayBanner = document.querySelector(".d-day-banner");
+  
+  if (remainingDays === 0) {
+    dDayBadge.textContent = "D-Day!";
+    dDayText.textContent = "목표일이 되었습니다. 마지막까지 화이팅!";
+    dDayBanner.style.background = "#fee2e2";
+    dDayBanner.style.color = "#dc2626";
+  } else {
+    dDayBadge.textContent = `D-${remainingDays}`;
+    dDayText.textContent = `목표일까지 약 ${Math.ceil(remainingDays / 30)}개월 남았습니다.`;
+    
+    // Warning colors if time progress > task progress significantly
+    if (timePercent > taskPercent + 20) {
+      dDayBanner.style.background = "#ffedd5";
+      dDayBanner.style.color = "#ea580c";
+      dDayText.textContent += " (일정이 지연되고 있습니다!)";
+    } else {
+      dDayBanner.style.background = "var(--primary-soft)";
+      dDayBanner.style.color = "var(--primary)";
+    }
+  }
+
   document.querySelector("#remainingText").textContent =
     checklist.length - doneCount > 0
       ? `남은 일정: ${checklist.length - doneCount}개`
       : "모든 일정을 완료했습니다.";
+
+  const certContainer = document.querySelector("#certScheduleContainer");
+  const certList = document.querySelector("#certScheduleList");
+  
+  if (state.roadmap?.certSchedules && state.roadmap.certSchedules.length > 0) {
+    certContainer.classList.remove("hidden");
+    certList.innerHTML = state.roadmap.certSchedules.map(cert => `
+      <li style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line);">
+        <strong style="display: block; margin-bottom: 4px;">🎯 ${cert.name}</strong>
+        접수일: ${cert.schedule.접수일} <br/>
+        시험일: <span style="color: var(--primary); font-weight: 700;">${cert.schedule.시험일}</span> <br/>
+        발표일: ${cert.schedule.발표일}
+      </li>
+    `).join("");
+  } else {
+    certContainer.classList.add("hidden");
+    certList.innerHTML = "";
+  }
 
   const checklistBox = document.querySelector("#checklist");
   checklistBox.innerHTML = "";
@@ -718,7 +840,7 @@ function renderProgress() {
         draggable="true"
         aria-label="${item.title} 우선순위 변경"
         title="드래그해서 우선순위 변경"
-      >☰</button>
+      ><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg></button>
       <input type="checkbox" ${item.done ? "checked" : ""} aria-label="${item.title} 완료" />
       <div>
         <h3>${item.title}</h3>
@@ -824,6 +946,18 @@ async function persistProgress() {
 
 goalForm.addEventListener("input", () => validateGoal(false));
 goalForm.addEventListener("change", () => validateGoal(false));
+
+fields.targetPeriod.addEventListener("change", () => {
+  if (fields.targetPeriod.value === "custom") {
+    fields.customTargetPeriod.classList.remove("hidden");
+    fields.customTargetPeriod.focus();
+  } else {
+    fields.customTargetPeriod.classList.add("hidden");
+    fields.customTargetPeriod.value = "";
+  }
+  validateGoal(false);
+});
+fields.customTargetPeriod.addEventListener("input", () => validateGoal(false));
 fields.jobRole.addEventListener("change", () => {
   if (fields.jobRole.value) {
     fields.customJobRole.value = "";
@@ -999,6 +1133,129 @@ stepButtons.forEach((button) => {
     }
   });
 });
+
+const recalcPeriodButton = document.querySelector("#recalcPeriodButton");
+const recalcPeriodForm = document.querySelector("#recalcPeriodForm");
+const newTargetPeriod = document.querySelector("#newTargetPeriod");
+const newCustomTargetPeriod = document.querySelector("#newCustomTargetPeriod");
+const submitRecalcBtn = document.querySelector("#submitRecalcBtn");
+const cancelRecalcBtn = document.querySelector("#cancelRecalcBtn");
+
+if (recalcPeriodButton) {
+  recalcPeriodButton.addEventListener("click", () => {
+    recalcPeriodForm.classList.remove("hidden");
+    recalcPeriodButton.parentElement.classList.add("hidden");
+  });
+
+  cancelRecalcBtn.addEventListener("click", () => {
+    recalcPeriodForm.classList.add("hidden");
+    recalcPeriodButton.parentElement.classList.remove("hidden");
+  });
+
+  newTargetPeriod.addEventListener("change", () => {
+    if (newTargetPeriod.value === "custom") {
+      newCustomTargetPeriod.classList.remove("hidden");
+      newCustomTargetPeriod.focus();
+    } else {
+      newCustomTargetPeriod.classList.add("hidden");
+      newCustomTargetPeriod.value = "";
+    }
+  });
+
+  submitRecalcBtn.addEventListener("click", async () => {
+    let periodVal = newTargetPeriod.value;
+    if (periodVal === "custom") {
+      periodVal = newCustomTargetPeriod.value.trim();
+      if (!periodVal) {
+        alert("새로운 준비 기간을 입력해주세요.");
+        return;
+      }
+    }
+
+    state.goal.targetPeriod = periodVal;
+    fields.targetPeriod.value = newTargetPeriod.value;
+    if (periodVal === "custom") {
+      fields.customTargetPeriod.value = newCustomTargetPeriod.value;
+    }
+    
+    const completedTasks = (state.roadmap?.checklist || []).filter(item => item.done);
+    
+    setLoading(true);
+    try {
+      const response = await fetch("/api/generate-roadmap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...state.goal, completedTasks })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to recalculate");
+      }
+      
+      state.roadmap = data.roadmap;
+      if (data.certSchedules) {
+        state.roadmap.certSchedules = data.certSchedules;
+      }
+      renderRoadmap();
+      renderProgress();
+      
+      if (state.session && state.savedRoadmapId) {
+        await persistProgress();
+      }
+      
+      alert("준비 기간 재조정이 완료되었습니다.");
+      cancelRecalcBtn.click();
+    } catch (error) {
+      alert("재조정 중 오류가 발생했습니다: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  });
+}
+
+const addCustomCheckItemBtn = document.querySelector("#addCustomCheckItemBtn");
+const customCheckItemTitle = document.querySelector("#customCheckItemTitle");
+const customCheckItemDesc = document.querySelector("#customCheckItemDesc");
+const customCheckItemPriority = document.querySelector("#customCheckItemPriority");
+const customCheckItemPeriod = document.querySelector("#customCheckItemPeriod");
+
+if (addCustomCheckItemBtn) {
+  addCustomCheckItemBtn.addEventListener("click", async () => {
+    const title = customCheckItemTitle.value.trim();
+    if (!title) {
+      alert("항목 제목을 입력해주세요.");
+      return;
+    }
+    
+    const desc = customCheckItemDesc.value.trim();
+    const priority = customCheckItemPriority.value;
+    const period = customCheckItemPeriod.value.trim();
+    
+    const newItem = {
+      id: "custom-" + Date.now(),
+      title: `[${priority}] ${title}`,
+      description: desc,
+      duration: period,
+      done: false
+    };
+    
+    if (!state.roadmap.checklist) {
+      state.roadmap.checklist = [];
+    }
+    state.roadmap.checklist.push(newItem);
+    
+    renderProgress();
+    
+    if (state.session && state.savedRoadmapId) {
+      await persistProgress();
+    }
+    
+    customCheckItemTitle.value = "";
+    customCheckItemDesc.value = "";
+    customCheckItemPeriod.value = "";
+  });
+}
 
 initSupabaseAuth();
 validateGoal(false);

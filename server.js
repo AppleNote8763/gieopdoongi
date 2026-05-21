@@ -14,7 +14,14 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY;
-const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const geminiModel = "gemini-2.5-flash";
+
+const CERT_SCHEDULES = {
+  "정보처리기사": { 접수일: "2026-06-10", 시험일: "2026-07-20", 발표일: "2026-08-15" },
+  "SQLD": { 접수일: "2026-08-01", 시험일: "2026-09-05", 발표일: "2026-09-25" },
+  "ADsP": { 접수일: "2026-07-15", 시험일: "2026-08-22", 발표일: "2026-09-10" },
+  "컴퓨터활용능력 1급": { 접수일: "상시", 시험일: "상시 (매주 월~금)", 발표일: "시험 후 2주 뒤" }
+};
 
 const supabaseAdmin =
   supabaseUrl && supabaseServiceRoleKey
@@ -490,6 +497,15 @@ async function generateWithGemini(input) {
     return getFallbackRoadmap(input);
   }
 
+  const relevantCerts = Object.keys(CERT_SCHEDULES).filter(cert => 
+    (input.certifications && input.certifications.includes(cert)) || 
+    (input.jobRole && input.jobRole.includes(cert))
+  );
+  
+  const certSchedulesText = relevantCerts.length > 0 
+    ? `\n[관련 자격증 시험 일정 (반드시 체크리스트와 주차별 일정에 최우선 반영할 것)]\n${relevantCerts.map(cert => `- ${cert}: 접수일(${CERT_SCHEDULES[cert].접수일}), 시험일(${CERT_SCHEDULES[cert].시험일})`).join('\n')}` 
+    : "";
+
   const prompt = `
 아래 입력값을 바탕으로 한국어 취업 준비 로드맵을 JSON으로만 생성해줘.
 
@@ -499,6 +515,8 @@ async function generateWithGemini(input) {
 경력 수준: ${input.level}
 희망 준비 기간: ${input.targetPeriod || "AI 추천"}
 목표 자격증: ${input.certifications || "AI 추천"}
+${certSchedulesText}
+${input.completedTasks ? `\n[기존 완료된 학습/과제 항목 (보존 필수)]\n${input.completedTasks.map(t => `- ${t.title}`).join('\n')}\n* 주의: 사용자가 이미 완료한 위 항목들은 체크리스트(checklist) 배열의 앞부분에 반드시 포함시키고 (done: true로 설정), 남은 기간 동안 수행해야 할 새로운 항목들만 추가로 생성해줘. 임박한 시험 일정과 관련된 태스크는 최우선 순위(상단)로 배치해줘.` : ""}
 
 [작성 가이드라인]
 1. 준비 기간 설계:
@@ -595,11 +613,24 @@ app.post("/api/generate-roadmap", async (req, res) => {
       skills: String(req.body.skills || "").trim(),
       level: req.body.level.trim(),
       targetPeriod: String(req.body.targetPeriod || "").trim(),
-      certifications: String(req.body.certifications || "").trim()
+      certifications: String(req.body.certifications || "").trim(),
+      completedTasks: req.body.completedTasks || null
     };
     const roadmap = await generateWithGemini(input);
 
-    return res.json({ roadmap });
+    const relevantCerts = Object.keys(CERT_SCHEDULES).filter(cert => 
+      (input.certifications && input.certifications.includes(cert)) || 
+      (input.jobRole && input.jobRole.includes(cert)) ||
+      (roadmap.certifications && roadmap.certifications.includes(cert)) ||
+      JSON.stringify(roadmap).includes(cert)
+    );
+    
+    const certSchedules = relevantCerts.map(cert => ({
+      name: cert,
+      schedule: CERT_SCHEDULES[cert]
+    }));
+
+    return res.json({ roadmap, certSchedules });
   } catch (err) {
     return res.status(500).json({
       message: "로드맵 생성 중 오류가 발생했습니다.",
