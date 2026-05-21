@@ -127,6 +127,18 @@ textarea {
   -webkit-text-fill-color: transparent;
 }
 
+.logo-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.logo-link:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: var(--primary);
