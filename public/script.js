@@ -1137,7 +1137,13 @@ function renderProgress() {
   const checklistBox = document.querySelector("#checklist");
   checklistBox.innerHTML = "";
 
+  function cleanTitle(title) {
+    // 옛 코드로 저장된 " ..." / "..." 말줄임 제거
+    return String(title || "").replace(/\s*\.\.\.\s*$/, "").trim();
+  }
+
   checklist.forEach((item, index) => {
+    const displayTitle = cleanTitle(item.title);
     const row = document.createElement("article");
     row.className = `check-item ${item.done ? "done" : ""}`;
     row.dataset.index = String(index);
@@ -1146,12 +1152,12 @@ function renderProgress() {
         class="drag-handle"
         type="button"
         draggable="true"
-        aria-label="${item.title} 우선순위 변경"
+        aria-label="${displayTitle} 우선순위 변경"
         title="드래그해서 우선순위 변경"
       ><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg></button>
-      <input type="checkbox" ${item.done ? "checked" : ""} aria-label="${item.title} 완료" />
+      <input type="checkbox" ${item.done ? "checked" : ""} aria-label="${displayTitle} 완료" />
       <div>
-        <h3>${item.title}</h3>
+        <h3>${displayTitle}</h3>
         <p>${item.description}</p>
       </div>
       <div class="check-meta">
@@ -1162,7 +1168,7 @@ function renderProgress() {
             type="text"
             value="${escapeHtml(item.duration || "")}"
             placeholder="예: 2일, 1주"
-            aria-label="${escapeHtml(item.title)} 예상 기간 수정"
+            aria-label="${escapeHtml(displayTitle)} 예상 기간 수정"
           />
         </label>
         <span class="${item.done ? "status-done" : ""}">${item.done ? "완료" : "진행 중"}</span>
