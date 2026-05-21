@@ -71,7 +71,7 @@ function showPanel(name) {
   if (activePanel) {
     activePanel.setAttribute("tabindex", "-1");
     activePanel.style.outline = "none";
-    activePanel.focus();
+    activePanel.focus({ preventScroll: true });
   }
 }
 
