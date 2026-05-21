@@ -342,10 +342,10 @@
             <div class="dashboard-progress-group">
               <div class="progress-card compact-card">
                 <div class="progress-card-head">
-                  <span>업무 진행률</span>
+                  <span>학습 진행률</span>
                   <strong id="progressPercent">0%</strong>
                 </div>
-                <div class="progress-bar" aria-label="업무 진행률">
+                <div class="progress-bar" aria-label="학습 진행률">
                   <span id="progressFill"></span>
                 </div>
                 <p id="progressCount">0 / 0 완료</p>
@@ -425,9 +425,39 @@
           </aside>
 
           <div class="content-card">
+            <div class="roadmap-content" id="dashboardRoadmapContent" style="margin-bottom: 24px;">
+              <div class="section-heading compact">
+                <p class="eyebrow">Roadmap</p>
+                <h2>맞춤 준비 로드맵</h2>
+              </div>
+              <div class="roadmap-grid">
+                <section class="roadmap-block">
+                  <h3>핵심 역량</h3>
+                  <ul id="dashboardCoreSkillsList"></ul>
+                </section>
+                <section class="roadmap-block">
+                  <h3>보완할 역량</h3>
+                  <ul id="dashboardGapsList"></ul>
+                </section>
+                <section class="roadmap-block">
+                  <h3>우선순위</h3>
+                  <ol id="dashboardPriorityList"></ol>
+                </section>
+                <section class="roadmap-block">
+                  <h3>면접 준비</h3>
+                  <ul id="dashboardInterviewList"></ul>
+                </section>
+              </div>
+              <section class="roadmap-block emphasis-block" style="margin-top: 16px;">
+                <h3>오늘의 첫 행동</h3>
+                <p id="dashboardFirstAction"></p>
+              </section>
+              <section class="roadmap-block" style="margin-top: 16px;">
+                <h3>포트폴리오 방향</h3>
+                <p id="dashboardPortfolioDirection"></p>
+              </section>
+            </div>
             <div class="section-heading compact checklist-heading">
-              <div>
-                <p class="eyebrow">Checklist</p>
                 <h2>학습 체크리스트</h2>
               </div>
               <small class="helper-text">

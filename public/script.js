@@ -663,6 +663,15 @@ function renderRoadmap() {
 
   fields.firstAction.textContent = state.roadmap.firstAction || "";
   fields.portfolioDirection.textContent = state.roadmap.portfolioDirection || "";
+
+  renderList("#dashboardCoreSkillsList", state.roadmap.coreSkills || []);
+  renderList("#dashboardGapsList", state.roadmap.gaps || []);
+  renderList("#dashboardPriorityList", state.roadmap.priorities || [], true);
+  renderList("#dashboardInterviewList", state.roadmap.interviewItems || []);
+  
+  document.querySelector("#dashboardFirstAction").textContent = state.roadmap.firstAction || "";
+  document.querySelector("#dashboardPortfolioDirection").textContent = state.roadmap.portfolioDirection || "";
+
   renderJobPostings();
   saveButton.disabled = !state.session;
 }
