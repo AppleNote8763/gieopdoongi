@@ -315,14 +315,12 @@ textarea {
   min-height: auto;
 }
 
-#firstAction {
-  min-height: 78px;
-  max-height: 78px;
-}
-
-#portfolioDirection {
-  min-height: 118px;
-  max-height: 118px;
+.roadmap-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .field input:focus,
@@ -745,7 +743,8 @@ textarea {
 
 .insight-grid h3,
 .week-card h3,
-.check-item h3 {
+.check-item h3,
+.roadmap-editor h3 {
   margin: 0 0 10px;
   font-size: 15px;
   font-weight: 700;

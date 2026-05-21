@@ -396,18 +396,13 @@ function renderRoadmap() {
   renderList("#interviewList", state.roadmap.interviewItems || []);
   renderWeeks();
 
-  fields.firstAction.value = state.roadmap.firstAction || "";
-  fields.portfolioDirection.value = state.roadmap.portfolioDirection || "";
+  fields.firstAction.textContent = state.roadmap.firstAction || "";
+  fields.portfolioDirection.textContent = state.roadmap.portfolioDirection || "";
   saveButton.disabled = !state.session;
 }
 
 function syncEditableRoadmap() {
-  if (!state.roadmap) {
-    return;
-  }
-
-  state.roadmap.firstAction = fields.firstAction.value.trim();
-  state.roadmap.portfolioDirection = fields.portfolioDirection.value.trim();
+  // Fields are now static and read-only, no sync needed.
 }
 
 async function initSupabaseAuth() {
@@ -958,9 +953,6 @@ startProgressButton.addEventListener("click", async () => {
   renderProgress();
   showPanel("progress");
 });
-
-fields.firstAction.addEventListener("input", syncEditableRoadmap);
-fields.portfolioDirection.addEventListener("input", syncEditableRoadmap);
 
 document.querySelector("#showLoginButton").addEventListener("click", () => showPanel("login"));
 document.querySelector("#showSignupButton").addEventListener("click", () => showPanel("signup"));
