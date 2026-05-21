@@ -54,12 +54,89 @@ async function requireAuth(req, res, next) {
   next();
 }
 
-function getFallbackRoadmap({ company, jobRole, skills, level }) {
+function getFallbackRoadmap({ company, jobRole, skills, level, targetPeriod, certifications }) {
   const currentSkills = skills || "현재 보유 역량";
+  let period = "4주";
+  let weeksCount = 4;
+
+  if (targetPeriod) {
+    if (targetPeriod.includes("1개월") || targetPeriod.includes("4주")) {
+      weeksCount = 4;
+      period = "4주 (1개월)";
+    } else if (targetPeriod.includes("3개월") || targetPeriod.includes("12주")) {
+      weeksCount = 8;
+      period = "8주 (3개월)";
+    } else if (targetPeriod.includes("6개월") || targetPeriod.includes("24주")) {
+      weeksCount = 12;
+      period = "12주 (6개월)";
+    } else if (targetPeriod.includes("12개월") || targetPeriod.includes("1년") || targetPeriod.includes("52주")) {
+      weeksCount = 16;
+      period = "16주 (1년)";
+    }
+  }
+
+  const weeks = [];
+  for (let i = 1; i <= weeksCount; i++) {
+    let weekTitle = "";
+    let weekTasks = [];
+    if (i === 1) {
+      weekTitle = "목표 분석과 기초 보강";
+      weekTasks = [
+        `${company} ${jobRole} 채용 공고 3개 분석`,
+        "요구 기술을 필수, 우대, 보완으로 분류",
+        "현재 기술과 부족한 기술 비교표 작성"
+      ];
+    } else if (i === weeksCount) {
+      weekTitle = "지원 준비와 면접 연습";
+      weekTasks = [
+        `이력서와 포트폴리오를 ${company} 기준으로 수정`,
+        "프로젝트 기반 기술 면접 답변 준비",
+        "최종 점검 및 모의 면접 실행"
+      ];
+    } else if (i === weeksCount - 1) {
+      weekTitle = "이력서 정리 및 포트폴리오 다듬기";
+      weekTasks = [
+        "포트폴리오 README 및 시각 자료 정리",
+        "이력서 내 문제 해결 과정 기술 보완",
+        "동료 피드백 수렴 및 수정"
+      ];
+    } else {
+      weekTitle = `핵심 역량 강화 및 프로젝트 진행 (단계 ${i - 1})`;
+      weekTasks = [
+        `${jobRole} 실무 프로젝트 기능 개발`,
+        `부족한 역량(${currentSkills}) 극복을 위한 학습`,
+        "코드 리팩토링 및 테스트 수행"
+      ];
+    }
+
+    if (certifications && certifications !== "AI 추천" && i % 2 === 0) {
+      weekTasks.push(`${certifications} 시험 대비 이론 학습 및 기출문제 풀이`);
+    }
+
+    weeks.push({
+      week: i,
+      title: weekTitle,
+      tasks: weekTasks
+    });
+  }
+
+  const checklist = [];
+  weeks.forEach((w) => {
+    w.tasks.forEach((t, taskIdx) => {
+      checklist.push({
+        id: `task-${w.week}-${taskIdx + 1}`,
+        title: `${w.title} - ${t.substring(0, 15)}...`,
+        description: t,
+        duration: "3-5일",
+        done: false
+      });
+    });
+  });
 
   return {
     coreSkills: [
       `${jobRole} 직무 핵심 기술`,
+      certifications && certifications !== "AI 추천" ? certifications : "직무 관련 자격증",
       "문제 해결력과 자료 구조 이해",
       "Git, 배포, 협업 도구 사용 경험",
       `${company} 서비스와 채용 공고 기반 도메인 이해`
@@ -76,44 +153,7 @@ function getFallbackRoadmap({ company, jobRole, skills, level }) {
       "이력서와 README 정리",
       "기술 면접 답변 연습"
     ],
-    weeks: [
-      {
-        week: 1,
-        title: "목표 분석과 기초 보강",
-        tasks: [
-          `${company} ${jobRole} 채용 공고 3개 분석`,
-          "요구 기술을 필수, 우대, 보완으로 분류",
-          "현재 기술과 부족한 기술 비교표 작성"
-        ]
-      },
-      {
-        week: 2,
-        title: "핵심 기술 심화",
-        tasks: [
-          "가장 중요한 기술 2개 집중 학습",
-          "학습 내용을 작은 예제로 구현",
-          "문제 해결 과정을 기록"
-        ]
-      },
-      {
-        week: 3,
-        title: "포트폴리오 프로젝트 제작",
-        tasks: [
-          "직무와 연결되는 미니 프로젝트 완성",
-          "README에 문제, 해결 방법, 결과 정리",
-          "GitHub 저장소 정리"
-        ]
-      },
-      {
-        week: 4,
-        title: "지원 준비와 면접 연습",
-        tasks: [
-          "이력서와 포트폴리오를 목표 기업 기준으로 수정",
-          "프로젝트 기반 기술 면접 답변 준비",
-          "지원 일정과 회고 체크리스트 작성"
-        ]
-      }
-    ],
+    weeks: weeks,
     portfolioDirection:
       `${company}의 ${jobRole} 업무와 연결되는 문제를 정하고, ${currentSkills}를 활용해 작동 결과와 의사결정 과정을 함께 보여주세요.`,
     interviewItems: [
@@ -125,44 +165,8 @@ function getFallbackRoadmap({ company, jobRole, skills, level }) {
     ],
     firstAction:
       `오늘 ${company}의 ${jobRole} 채용 공고 1개를 찾아 필수 기술 5개를 정리하세요.`,
-    checklist: [
-      {
-        id: "task-1",
-        title: "채용 공고 분석",
-        description: `${company} ${jobRole} 공고에서 필수 역량과 우대 역량 분리`,
-        duration: "1일",
-        done: false
-      },
-      {
-        id: "task-2",
-        title: "핵심 기술 학습",
-        description: "가장 중요한 기술 2개를 예제와 함께 학습",
-        duration: "1주",
-        done: false
-      },
-      {
-        id: "task-3",
-        title: "포트폴리오 프로젝트",
-        description: "직무와 연결되는 작은 프로젝트 완성",
-        duration: "2주",
-        done: false
-      },
-      {
-        id: "task-4",
-        title: "README와 이력서 정리",
-        description: "프로젝트 배경, 역할, 결과를 문서화",
-        duration: "3일",
-        done: false
-      },
-      {
-        id: "task-5",
-        title: "면접 답변 연습",
-        description: "기술 질문과 프로젝트 설명을 말로 연습",
-        duration: "3일",
-        done: false
-      }
-    ],
-    estimatedPeriod: level === "초급(신입)" ? "4주" : "3~4주"
+    checklist: checklist.slice(0, 10),
+    estimatedPeriod: period
   };
 }
 
@@ -493,27 +497,41 @@ async function generateWithGemini(input) {
 희망 직무: ${input.jobRole}
 현재 보유 기술/역량: ${input.skills || "입력하지 않음"}
 경력 수준: ${input.level}
+희망 준비 기간: ${input.targetPeriod || "AI 추천"}
+목표 자격증: ${input.certifications || "AI 추천"}
 
-현재 보유 기술/역량이 비어 있으면, 해당 직무를 처음 준비하는 사람으로 보고 기초 점검부터 시작하는 로드맵을 만들어줘.
+[작성 가이드라인]
+1. 준비 기간 설계:
+   - '희망 준비 기간'이 "AI 추천"이거나 비어 있는 경우, 목표 기업/직무의 난이도와 사용자 경력/역량을 분석하여 가장 적절한 기간(예: 3개월, 6개월 등)을 스스로 판단하고, 전체 예상 준비 기간('estimatedPeriod') 필드에 기록해줘.
+   - 준비 기간에 맞춰 'weeks' 배열의 크기를 유동적으로 생성해줘.
+     - 1개월 (4주 내외): 4개 주차 생성
+     - 3개월 (8~12주 내외): 8~12개 주차 생성
+     - 6개월 이상: 10~12개의 마일스톤 주차 생성 (주요 단계별로 묶어서 표현 가능)
+   - 현재 보유 기술이 비어 있으면 처음 시작하는 초보자 관점에서 기초 다지기 주차를 초반에 배치해줘.
 
-반드시 다음 JSON 구조를 지켜줘.
+2. 자격증 및 시험 준비 전략:
+   - '목표 자격증'이 지정되었거나 "AI 추천"일 때 이 직무/기업에 우대되거나 필수적인 자격증(예: 정보처리기사, SQLD, ADsP, AWS 자격증, 어학 등)을 파악하고, 로드맵의 'weeks'와 'checklist'에 시험 일정 확인, 개념 학습, 기출 풀이 등 구체적인 학습 태스크를 포함시켜줘.
+   - 'coreSkills'에도 해당 자격증을 핵심 기술로서 표기해줘.
+
+3. 체크리스트 연동:
+   - 'weeks'의 세부 태스크와 연동되는 'checklist'를 구체적으로 만들어줘.
+   - 각 체크리스트 아이템은 고유한 id("task-1", "task-2", ...)를 가져야 하며, 실제 실행 가능한 상세한 액션 아이템이어야 해.
+
+반드시 다음 JSON 구조를 엄격하게 지켜서 JSON 마크다운 기호 없이 순수 JSON 텍스트 또는 JSON 블록으로만 반환해줘.
 {
-  "coreSkills": ["필요한 핵심 기술"],
+  "coreSkills": ["필요한 핵심 기술 및 자격증"],
   "gaps": ["부족한 역량"],
   "priorities": ["학습 우선순위"],
   "weeks": [
-    {"week": 1, "title": "주차 제목", "tasks": ["할 일"]},
-    {"week": 2, "title": "주차 제목", "tasks": ["할 일"]},
-    {"week": 3, "title": "주차 제목", "tasks": ["할 일"]},
-    {"week": 4, "title": "주차 제목", "tasks": ["할 일"]}
+    {"week": 1, "title": "주차/단계 제목", "tasks": ["할 일 1", "할 일 2"]}
   ],
-  "portfolioDirection": "포트폴리오 준비 방향",
-  "interviewItems": ["면접 준비 항목"],
-  "firstAction": "오늘 시작할 첫 번째 행동",
+  "portfolioDirection": "포트폴리오 준비 방향 (목표 자격증이나 학습 결과물을 포트폴리오에 녹여내는 방법 포함)",
+  "interviewItems": ["면접 준비 항목 (해당 직무와 자격증/핵심기술 면접 질문 예시 포함)"],
+  "firstAction": "오늘 시작할 첫 번째 행동 (매우 구체적인 액션)",
   "checklist": [
-    {"id": "task-1", "title": "작업명", "description": "설명", "duration": "예상 기간", "done": false}
+    {"id": "task-1", "title": "작업명", "description": "상세 설명", "duration": "예상 기간(예: 3일, 1주일)", "done": false}
   ],
-  "estimatedPeriod": "전체 예상 준비 기간"
+  "estimatedPeriod": "전체 예상 준비 기간 (예: 3개월, 4주, 6개월)"
 }
 `;
 
@@ -575,7 +593,9 @@ app.post("/api/generate-roadmap", async (req, res) => {
       company: req.body.company.trim(),
       jobRole: req.body.jobRole.trim(),
       skills: String(req.body.skills || "").trim(),
-      level: req.body.level.trim()
+      level: req.body.level.trim(),
+      targetPeriod: String(req.body.targetPeriod || "").trim(),
+      certifications: String(req.body.certifications || "").trim()
     };
     const roadmap = await generateWithGemini(input);
 
