@@ -765,8 +765,21 @@ function renderProgress() {
       await persistProgress();
     });
 
-    row.querySelector("input").addEventListener("change", async (event) => {
-      item.done = event.target.checked;
+    row.addEventListener("click", async (event) => {
+      if (event.target.closest(".drag-handle")) {
+        return;
+      }
+
+      if (window.getSelection().toString().trim() !== "") {
+        return;
+      }
+
+      const checkbox = row.querySelector("input");
+      if (event.target !== checkbox) {
+        checkbox.checked = !checkbox.checked;
+      }
+
+      item.done = checkbox.checked;
       await persistProgress();
       renderProgress();
     });
