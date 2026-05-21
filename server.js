@@ -195,6 +195,128 @@ function parseGeminiJson(text) {
   }
 }
 
+function getFallbackRoles(company) {
+  const value = company.toLowerCase();
+
+  if (/(sound|audio|music|yamaha|shure|bose|sony|음향|오디오|악기|레코딩|사운드)/i.test(value)) {
+    return [
+      "오디오 DSP 엔지니어",
+      "음향 하드웨어 엔지니어",
+      "임베디드 오디오 개발자",
+      "오디오 소프트웨어 개발자",
+      "음향 제품 기획",
+      "사운드 디자이너",
+      "음향 시스템 엔지니어",
+      "레코딩 장비 QA 엔지니어",
+      "기술 영업/세일즈 엔지니어"
+    ];
+  }
+
+  if (/(coupang|쿠팡|배달|물류|커머스|commerce|market)/i.test(value)) {
+    return [
+      "백엔드 개발",
+      "물류 시스템 개발",
+      "데이터 분석",
+      "머신러닝 엔지니어",
+      "프로덕트 매니저",
+      "풀필먼트 운영 기획",
+      "프론트엔드 개발",
+      "보안 엔지니어"
+    ];
+  }
+
+  if (/(game|게임|nexon|netmarble|ncsoft|krafton|넥슨|넷마블|크래프톤)/i.test(value)) {
+    return [
+      "게임 클라이언트 개발",
+      "게임 서버 개발",
+      "게임 기획",
+      "레벨 디자이너",
+      "QA 테스터",
+      "데이터 분석",
+      "라이브 운영 PM",
+      "3D 아티스트"
+    ];
+  }
+
+  return [
+    "백엔드 개발",
+    "프론트엔드 개발",
+    "풀스택 개발",
+    "데이터 분석",
+    "AI/ML 엔지니어",
+    "PM/서비스 기획",
+    "UI/UX 디자이너",
+    "QA 엔지니어"
+  ];
+}
+
+function normalizeRoles(parsed, company) {
+  const roles = Array.isArray(parsed.roles) ? parsed.roles : [];
+  const cleanRoles = roles
+    .map((role) => String(role || "").trim())
+    .filter(Boolean)
+    .slice(0, 10);
+
+  return cleanRoles.length > 0 ? cleanRoles : getFallbackRoles(company);
+}
+
+async function generateRoleSuggestions(company) {
+  if (!geminiApiKey) {
+    return getFallbackRoles(company);
+  }
+
+  const prompt = `
+기업명 또는 산업 키워드: ${company}
+
+이 기업 또는 업종에서 취업 준비자가 지원할 만한 직군/직무를 한국어로 추천해줘.
+실시간 채용 공고처럼 단정하지 말고, 기업과 산업 특성을 바탕으로 가능성 높은 직군을 추천해줘.
+너무 일반적인 직무만 나열하지 말고 업종 특화 직무를 우선 포함해줘.
+
+반드시 아래 JSON만 반환해줘.
+{
+  "roles": ["직무명 1", "직무명 2", "직무명 3"]
+}
+`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [
+            {
+              text:
+                "너는 기업과 산업을 분석해 취업 가능한 직군을 추천하는 커리어 리서처야."
+            }
+          ]
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.35,
+          responseMimeType: "application/json"
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    if (response.status === 429 || response.status === 503) {
+      return getFallbackRoles(company);
+    }
+
+    const detail = await response.text();
+    throw new Error(`Gemini API 오류: ${detail}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  const parsed = parseGeminiJson(content);
+
+  return normalizeRoles(parsed, company);
+}
+
 async function generateWithGemini(input) {
   if (!geminiApiKey) {
     return getFallbackRoadmap(input);
@@ -295,6 +417,24 @@ app.post("/api/generate-roadmap", async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       message: "로드맵 생성 중 오류가 발생했습니다.",
+      detail: err.message
+    });
+  }
+});
+
+app.post("/api/suggest-roles", async (req, res) => {
+  const company = String(req.body.company || "").trim();
+
+  if (!company) {
+    return res.status(400).json({ message: "목표 기업을 먼저 입력해주세요." });
+  }
+
+  try {
+    const roles = await generateRoleSuggestions(company);
+    return res.json({ roles });
+  } catch (err) {
+    return res.status(500).json({
+      message: "추천 직무를 불러오는 중 오류가 발생했습니다.",
       detail: err.message
     });
   }

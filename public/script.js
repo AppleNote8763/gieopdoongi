@@ -27,9 +27,12 @@ const generateButton = document.querySelector("#generateButton");
 const regenerateButton = document.querySelector("#regenerateButton");
 const saveButton = document.querySelector("#saveButton");
 const startProgressButton = document.querySelector("#startProgressButton");
+const suggestRolesButton = document.querySelector("#suggestRolesButton");
 const loadingBox = document.querySelector("#loadingBox");
 const roadmapContent = document.querySelector("#roadmapContent");
 const saveStatus = document.querySelector("#saveStatus");
+const roleHint = document.querySelector("#roleHint");
+const roleSuggestions = document.querySelector("#roleSuggestions");
 
 const fields = {
   company: document.querySelector("#company"),
@@ -104,6 +107,79 @@ function validateAuthForm(email, password, messageElement) {
 
   messageElement.textContent = "";
   return true;
+}
+
+function setRoleOptions(roles) {
+  const currentValue = fields.jobRole.value;
+  fields.jobRole.innerHTML = '<option value="">직무를 선택하세요</option>';
+
+  roles.forEach((role) => {
+    const option = document.createElement("option");
+    option.value = role;
+    option.textContent = role;
+    fields.jobRole.appendChild(option);
+  });
+
+  if (roles.includes(currentValue)) {
+    fields.jobRole.value = currentValue;
+  }
+}
+
+function renderRoleSuggestions(roles) {
+  roleSuggestions.innerHTML = "";
+
+  roles.forEach((role) => {
+    const button = document.createElement("button");
+    button.className = "role-chip";
+    button.type = "button";
+    button.textContent = role;
+    button.addEventListener("click", () => {
+      fields.jobRole.value = role;
+      validateGoal(false);
+      renderRoleSuggestions(roles);
+    });
+
+    if (fields.jobRole.value === role) {
+      button.classList.add("active");
+    }
+
+    roleSuggestions.appendChild(button);
+  });
+}
+
+async function suggestRoles() {
+  const company = fields.company.value.trim();
+
+  if (!company) {
+    setFieldError("company", "목표 기업을 먼저 입력해주세요.");
+    return;
+  }
+
+  suggestRolesButton.disabled = true;
+  roleHint.textContent = "기업과 업종을 분석해 추천 직무를 찾는 중입니다...";
+
+  try {
+    const response = await fetch("/api/suggest-roles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "추천 직무를 불러오지 못했습니다.");
+    }
+
+    const roles = data.roles || [];
+    setRoleOptions(roles);
+    renderRoleSuggestions(roles);
+    roleHint.textContent = `${company}와 관련성이 높은 직무를 추천했습니다.`;
+    validateGoal(false);
+  } catch (error) {
+    roleHint.textContent = error.message;
+  } finally {
+    suggestRolesButton.disabled = false;
+  }
 }
 
 function enableStep(name) {
@@ -516,6 +592,13 @@ async function persistProgress() {
 
 goalForm.addEventListener("input", () => validateGoal(false));
 goalForm.addEventListener("change", () => validateGoal(false));
+fields.jobRole.addEventListener("change", () => {
+  const roles = Array.from(fields.jobRole.options)
+    .map((option) => option.value)
+    .filter(Boolean);
+  renderRoleSuggestions(roles);
+});
+suggestRolesButton.addEventListener("click", suggestRoles);
 
 goalForm.addEventListener("submit", async (event) => {
   event.preventDefault();

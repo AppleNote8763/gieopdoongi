@@ -110,13 +110,18 @@
             <form id="goalForm" novalidate>
               <label class="field">
                 <span>목표 기업</span>
-                <input
-                  id="company"
-                  name="company"
-                  type="text"
-                  placeholder="예: 삼성전자, 네이버, 카카오"
-                  autocomplete="organization"
-                />
+                <div class="company-search-row">
+                  <input
+                    id="company"
+                    name="company"
+                    type="text"
+                    placeholder="예: 삼성전자, 네이버, 카카오"
+                    autocomplete="organization"
+                  />
+                  <button class="secondary-button compact-button" id="suggestRolesButton" type="button">
+                    직무 찾기
+                  </button>
+                </div>
                 <small class="error-text"></small>
               </label>
 
@@ -132,6 +137,8 @@
                   <option value="PM/서비스 기획">PM/서비스 기획</option>
                   <option value="UI/UX 디자이너">UI/UX 디자이너</option>
                 </select>
+                <small class="helper-text" id="roleHint">기업을 입력한 뒤 직무 찾기를 누르면 추천 직군이 표시됩니다.</small>
+                <div class="role-suggestions" id="roleSuggestions"></div>
                 <small class="error-text"></small>
               </label>
 
