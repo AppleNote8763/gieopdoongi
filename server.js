@@ -254,6 +254,11 @@ async function generateWithGemini(input) {
 
   if (!response.ok) {
     const detail = await response.text();
+
+    if (response.status === 429 || response.status === 503) {
+      return getFallbackRoadmap(input);
+    }
+
     throw new Error(`Gemini API 오류: ${detail}`);
   }
 
