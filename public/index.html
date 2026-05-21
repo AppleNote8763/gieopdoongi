@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>기업둥이 - AI 취업 준비 플래너</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">기업둥이</p>
+        <h1>AI 취업 준비 플래너</h1>
+      </div>
+
+      <div class="header-actions">
+        <nav class="step-nav" aria-label="진행 단계">
+          <button class="step-tab active" data-step-button="goal">1. 목표 설정</button>
+          <button class="step-tab" data-step-button="roadmap" disabled>2. 로드맵 생성</button>
+          <button class="step-tab" data-step-button="progress" disabled>3. 진행 관리</button>
+        </nav>
+
+        <div class="user-box">
+          <span id="userEmail">로그인하지 않음</span>
+          <button class="text-button" id="showLoginButton" type="button">로그인</button>
+          <button class="text-button" id="showSignupButton" type="button">회원가입</button>
+          <button class="text-button hidden" id="logoutButton" type="button">로그아웃</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="panel" id="loginPanel">
+        <div class="auth-card">
+          <div class="section-heading">
+            <p class="eyebrow">Account</p>
+            <h2>로그인</h2>
+            <p>저장된 로드맵과 진행률을 불러오려면 로그인하세요.</p>
+          </div>
+
+          <form id="loginForm" novalidate>
+            <label class="field">
+              <span>이메일</span>
+              <input id="loginEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+              <small class="error-text"></small>
+            </label>
+            <label class="field">
+              <span>비밀번호</span>
+              <input
+                id="loginPassword"
+                type="password"
+                placeholder="비밀번호"
+                autocomplete="current-password"
+              />
+              <small class="error-text"></small>
+            </label>
+            <button class="primary-button" type="submit">로그인</button>
+          </form>
+
+          <p class="helper-text auth-message" id="loginMessage"></p>
+          <button class="secondary-button full" id="goSignupButton" type="button">
+            계정이 없으면 회원가입
+          </button>
+        </div>
+      </section>
+
+      <section class="panel" id="signupPanel">
+        <div class="auth-card">
+          <div class="section-heading">
+            <p class="eyebrow">Account</p>
+            <h2>회원가입</h2>
+            <p>이메일 계정으로 가입하면 로드맵과 진행률을 사용자별로 저장할 수 있습니다.</p>
+          </div>
+
+          <form id="signupForm" novalidate>
+            <label class="field">
+              <span>이메일</span>
+              <input id="signupEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+              <small class="error-text"></small>
+            </label>
+            <label class="field">
+              <span>비밀번호</span>
+              <input
+                id="signupPassword"
+                type="password"
+                placeholder="6자 이상 입력"
+                autocomplete="new-password"
+              />
+              <small class="error-text"></small>
+            </label>
+            <button class="primary-button" type="submit">회원가입</button>
+          </form>
+
+          <p class="helper-text auth-message" id="signupMessage"></p>
+          <button class="secondary-button full" id="goLoginButton" type="button">
+            이미 계정이 있으면 로그인
+          </button>
+        </div>
+      </section>
+
+      <section class="panel active" id="goalPanel">
+        <div class="goal-layout">
+          <div class="form-card">
+            <div class="section-heading">
+              <p class="eyebrow">Step 1</p>
+              <h2>목표 설정</h2>
+              <p>목표 기업과 직무를 입력하면 현재 역량 기준으로 취업 준비 방향을 분석합니다.</p>
+            </div>
+
+            <form id="goalForm" novalidate>
+              <label class="field">
+                <span>목표 기업</span>
+                <input
+                  id="company"
+                  name="company"
+                  type="text"
+                  placeholder="예: 삼성전자, 네이버, 카카오"
+                  autocomplete="organization"
+                />
+                <small class="error-text"></small>
+              </label>
+
+              <label class="field">
+                <span>희망 직무</span>
+                <select id="jobRole" name="jobRole">
+                  <option value="">직무를 선택하세요</option>
+                  <option value="백엔드 개발">백엔드 개발</option>
+                  <option value="프론트엔드 개발">프론트엔드 개발</option>
+                  <option value="풀스택 개발">풀스택 개발</option>
+                  <option value="데이터 분석">데이터 분석</option>
+                  <option value="AI/ML 엔지니어">AI/ML 엔지니어</option>
+                  <option value="PM/서비스 기획">PM/서비스 기획</option>
+                  <option value="UI/UX 디자이너">UI/UX 디자이너</option>
+                </select>
+                <small class="error-text"></small>
+              </label>
+
+              <label class="field">
+                <span>현재 보유 기술/역량</span>
+                <textarea
+                  id="skills"
+                  name="skills"
+                  rows="5"
+                  placeholder="예: JavaScript, Node.js, SQL, 팀 프로젝트 경험"
+                ></textarea>
+                <small class="error-text"></small>
+              </label>
+
+              <fieldset class="level-field">
+                <legend>경력 수준</legend>
+                <div class="level-options">
+                  <label>
+                    <input type="radio" name="level" value="초급(신입)" />
+                    <span>초급(신입)</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="level" value="중급(1~3년)" />
+                    <span>중급(1~3년)</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="level" value="고급(3년+)" />
+                    <span>고급(3년+)</span>
+                  </label>
+                </div>
+                <small class="error-text" id="levelError"></small>
+              </fieldset>
+
+              <button class="primary-button" id="generateButton" type="submit" disabled>
+                AI 분석 시작하기
+              </button>
+            </form>
+          </div>
+
+          <aside class="summary-card saved-card">
+            <p class="eyebrow">My Roadmaps</p>
+            <h2>이전 데이터</h2>
+            <p id="savedRoadmapsHint">로그인하면 저장한 로드맵을 불러올 수 있습니다.</p>
+            <div class="saved-list" id="savedRoadmapsList"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel" id="roadmapPanel">
+        <div class="dashboard-grid">
+          <aside class="summary-card">
+            <p class="eyebrow">Step 2</p>
+            <h2>로드맵 생성</h2>
+            <div class="target-summary" id="targetSummary"></div>
+            <div class="button-row">
+              <button class="secondary-button" id="regenerateButton" type="button">다시 생성</button>
+              <button class="primary-button" id="saveButton" type="button">로드맵 저장</button>
+            </div>
+            <p class="helper-text" id="saveStatus"></p>
+          </aside>
+
+          <div class="content-card">
+            <div class="loading-box" id="loadingBox">
+              <div class="spinner"></div>
+              <h3>AI가 분석 중입니다</h3>
+              <p>기업, 직무, 현재 역량을 기준으로 맞춤 로드맵을 생성하고 있습니다.</p>
+            </div>
+
+            <div class="roadmap-content hidden" id="roadmapContent">
+              <div class="section-heading compact">
+                <p class="eyebrow">AI Roadmap</p>
+                <h2>맞춤형 취업 준비 로드맵</h2>
+                <p id="estimatedPeriod"></p>
+              </div>
+
+              <div class="insight-grid">
+                <article>
+                  <h3>필요한 핵심 기술</h3>
+                  <ul id="coreSkillsList"></ul>
+                </article>
+                <article>
+                  <h3>부족한 역량</h3>
+                  <ul id="gapsList"></ul>
+                </article>
+                <article>
+                  <h3>추천 학습 우선순위</h3>
+                  <ol id="priorityList"></ol>
+                </article>
+              </div>
+
+              <article class="roadmap-editor">
+                <label for="firstAction">오늘 시작할 첫 번째 행동</label>
+                <textarea id="firstAction" rows="3"></textarea>
+              </article>
+
+              <div class="week-list" id="weekList"></div>
+
+              <div class="insight-grid two-column">
+                <article>
+                  <h3>포트폴리오 준비 방향</h3>
+                  <textarea id="portfolioDirection" rows="5"></textarea>
+                </article>
+                <article>
+                  <h3>면접 준비 항목</h3>
+                  <ul id="interviewList"></ul>
+                </article>
+              </div>
+
+              <button class="primary-button full" id="startProgressButton" type="button">
+                진행 관리 시작하기
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="progressPanel">
+        <div class="dashboard-grid">
+          <aside class="summary-card">
+            <p class="eyebrow">Step 3</p>
+            <h2>진행 관리</h2>
+            <p id="progressSaveHint">로그인 후 저장한 로드맵만 진행률을 서버에 저장할 수 있습니다.</p>
+            <div class="progress-card">
+              <div>
+                <span>전체 진행률</span>
+                <strong id="progressPercent">0%</strong>
+                <p id="progressCount">0 / 0 완료</p>
+              </div>
+              <div class="progress-bar" aria-label="전체 진행률">
+                <span id="progressFill"></span>
+              </div>
+            </div>
+            <p class="helper-text" id="remainingText"></p>
+          </aside>
+
+          <div class="content-card">
+            <div class="section-heading compact">
+              <p class="eyebrow">Checklist</p>
+              <h2>학습 체크리스트</h2>
+            </div>
+            <div class="checklist" id="checklist"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,370 @@
+require("dotenv").config();
+
+const path = require("path");
+const express = require("express");
+const { createClient } = require("@supabase/supabase-js");
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json({ limit: "1mb" }));
+app.use(express.static(path.join(__dirname, "public")));
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const geminiApiKey = process.env.GEMINI_API_KEY;
+const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+
+const supabaseAdmin =
+  supabaseUrl && supabaseServiceRoleKey
+    ? createClient(supabaseUrl, supabaseServiceRoleKey)
+    : null;
+
+function validateGoalInput(body) {
+  const required = ["company", "jobRole", "skills", "level"];
+  const missing = required.filter((key) => !String(body[key] || "").trim());
+
+  if (missing.length > 0) {
+    return `필수 입력값이 비어 있습니다: ${missing.join(", ")}`;
+  }
+
+  return null;
+}
+
+async function requireAuth(req, res, next) {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ message: "Supabase 서버 환경 변수가 설정되지 않았습니다." });
+  }
+
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+  if (!token) {
+    return res.status(401).json({ message: "로그인이 필요합니다." });
+  }
+
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+  if (error || !data.user) {
+    return res.status(401).json({ message: "로그인 세션이 유효하지 않습니다." });
+  }
+
+  req.user = data.user;
+  next();
+}
+
+function getFallbackRoadmap({ company, jobRole, skills, level }) {
+  return {
+    coreSkills: [
+      `${jobRole} 직무 핵심 기술`,
+      "문제 해결력과 자료 구조 이해",
+      "Git, 배포, 협업 도구 사용 경험",
+      `${company} 서비스와 채용 공고 기반 도메인 이해`
+    ],
+    gaps: [
+      `${skills}를 실무 결과물로 보여주는 포트폴리오 보강`,
+      "프로젝트 의사결정 과정을 면접에서 설명하는 연습",
+      "채용 공고 요구 역량과 현재 역량 사이의 우선순위 정리"
+    ],
+    priorities: [
+      "채용 공고 분석",
+      "핵심 기술 심화 학습",
+      "직무형 포트폴리오 프로젝트 제작",
+      "이력서와 README 정리",
+      "기술 면접 답변 연습"
+    ],
+    weeks: [
+      {
+        week: 1,
+        title: "목표 분석과 기초 보강",
+        tasks: [
+          `${company} ${jobRole} 채용 공고 3개 분석`,
+          "요구 기술을 필수, 우대, 보완으로 분류",
+          "현재 기술과 부족한 기술 비교표 작성"
+        ]
+      },
+      {
+        week: 2,
+        title: "핵심 기술 심화",
+        tasks: [
+          "가장 중요한 기술 2개 집중 학습",
+          "학습 내용을 작은 예제로 구현",
+          "문제 해결 과정을 기록"
+        ]
+      },
+      {
+        week: 3,
+        title: "포트폴리오 프로젝트 제작",
+        tasks: [
+          "직무와 연결되는 미니 프로젝트 완성",
+          "README에 문제, 해결 방법, 결과 정리",
+          "GitHub 저장소 정리"
+        ]
+      },
+      {
+        week: 4,
+        title: "지원 준비와 면접 연습",
+        tasks: [
+          "이력서와 포트폴리오를 목표 기업 기준으로 수정",
+          "프로젝트 기반 기술 면접 답변 준비",
+          "지원 일정과 회고 체크리스트 작성"
+        ]
+      }
+    ],
+    portfolioDirection:
+      `${company}의 ${jobRole} 업무와 연결되는 문제를 정하고, ${skills}를 활용해 작동 결과와 의사결정 과정을 함께 보여주세요.`,
+    interviewItems: [
+      "자기소개와 지원 동기",
+      "핵심 기술 개념 설명",
+      "프로젝트 문제 해결 과정",
+      "협업 경험과 피드백 반영 사례",
+      "목표 기업 서비스 개선 아이디어"
+    ],
+    firstAction:
+      `오늘 ${company}의 ${jobRole} 채용 공고 1개를 찾아 필수 기술 5개를 정리하세요.`,
+    checklist: [
+      {
+        id: "task-1",
+        title: "채용 공고 분석",
+        description: `${company} ${jobRole} 공고에서 필수 역량과 우대 역량 분리`,
+        duration: "1일",
+        done: false
+      },
+      {
+        id: "task-2",
+        title: "핵심 기술 학습",
+        description: "가장 중요한 기술 2개를 예제와 함께 학습",
+        duration: "1주",
+        done: false
+      },
+      {
+        id: "task-3",
+        title: "포트폴리오 프로젝트",
+        description: "직무와 연결되는 작은 프로젝트 완성",
+        duration: "2주",
+        done: false
+      },
+      {
+        id: "task-4",
+        title: "README와 이력서 정리",
+        description: "프로젝트 배경, 역할, 결과를 문서화",
+        duration: "3일",
+        done: false
+      },
+      {
+        id: "task-5",
+        title: "면접 답변 연습",
+        description: "기술 질문과 프로젝트 설명을 말로 연습",
+        duration: "3일",
+        done: false
+      }
+    ],
+    estimatedPeriod: level === "초급(신입)" ? "4주" : "3~4주"
+  };
+}
+
+function normalizeRoadmap(parsed, input) {
+  const fallback = getFallbackRoadmap(input);
+
+  return {
+    coreSkills: Array.isArray(parsed.coreSkills) ? parsed.coreSkills : fallback.coreSkills,
+    gaps: Array.isArray(parsed.gaps) ? parsed.gaps : fallback.gaps,
+    priorities: Array.isArray(parsed.priorities) ? parsed.priorities : fallback.priorities,
+    weeks: Array.isArray(parsed.weeks) ? parsed.weeks : fallback.weeks,
+    portfolioDirection: parsed.portfolioDirection || fallback.portfolioDirection,
+    interviewItems: Array.isArray(parsed.interviewItems)
+      ? parsed.interviewItems
+      : fallback.interviewItems,
+    firstAction: parsed.firstAction || fallback.firstAction,
+    checklist: Array.isArray(parsed.checklist) ? parsed.checklist : fallback.checklist,
+    estimatedPeriod: parsed.estimatedPeriod || fallback.estimatedPeriod
+  };
+}
+
+function parseGeminiJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw error;
+    }
+
+    return JSON.parse(jsonMatch[0]);
+  }
+}
+
+async function generateWithGemini(input) {
+  if (!geminiApiKey) {
+    return getFallbackRoadmap(input);
+  }
+
+  const prompt = `
+아래 입력값을 바탕으로 한국어 취업 준비 로드맵을 JSON으로만 생성해줘.
+
+목표 기업: ${input.company}
+희망 직무: ${input.jobRole}
+현재 보유 기술/역량: ${input.skills}
+경력 수준: ${input.level}
+
+반드시 다음 JSON 구조를 지켜줘.
+{
+  "coreSkills": ["필요한 핵심 기술"],
+  "gaps": ["부족한 역량"],
+  "priorities": ["학습 우선순위"],
+  "weeks": [
+    {"week": 1, "title": "주차 제목", "tasks": ["할 일"]},
+    {"week": 2, "title": "주차 제목", "tasks": ["할 일"]},
+    {"week": 3, "title": "주차 제목", "tasks": ["할 일"]},
+    {"week": 4, "title": "주차 제목", "tasks": ["할 일"]}
+  ],
+  "portfolioDirection": "포트폴리오 준비 방향",
+  "interviewItems": ["면접 준비 항목"],
+  "firstAction": "오늘 시작할 첫 번째 행동",
+  "checklist": [
+    {"id": "task-1", "title": "작업명", "description": "설명", "duration": "예상 기간", "done": false}
+  ],
+  "estimatedPeriod": "전체 예상 준비 기간"
+}
+`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [
+            {
+              text:
+                "너는 채용 공고와 직무 역량을 분석해 초보자도 실행 가능한 취업 준비 계획을 만드는 커리어 코치야."
+            }
+          ]
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.4,
+          responseMimeType: "application/json"
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Gemini API 오류: ${detail}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+  const parsed = parseGeminiJson(content);
+
+  return normalizeRoadmap(parsed, input);
+}
+
+app.get("/api/config", (req, res) => {
+  res.json({
+    supabaseUrl: supabaseUrl || "",
+    supabaseAnonKey: supabaseAnonKey || ""
+  });
+});
+
+app.post("/api/generate-roadmap", async (req, res) => {
+  const error = validateGoalInput(req.body);
+  if (error) {
+    return res.status(400).json({ message: error });
+  }
+
+  try {
+    const input = {
+      company: req.body.company.trim(),
+      jobRole: req.body.jobRole.trim(),
+      skills: req.body.skills.trim(),
+      level: req.body.level.trim()
+    };
+    const roadmap = await generateWithGemini(input);
+
+    return res.json({ roadmap });
+  } catch (err) {
+    return res.status(500).json({
+      message: "로드맵 생성 중 오류가 발생했습니다.",
+      detail: err.message
+    });
+  }
+});
+
+app.post("/api/save-roadmap", requireAuth, async (req, res) => {
+  const { company, jobRole, skills, level, roadmap, progress = 0 } = req.body;
+  const error = validateGoalInput({ company, jobRole, skills, level });
+
+  if (error || !roadmap) {
+    return res.status(400).json({ message: error || "로드맵 데이터가 없습니다." });
+  }
+
+  const { data, error: dbError } = await supabaseAdmin
+    .from("roadmaps")
+    .insert({
+      user_id: req.user.id,
+      company,
+      job_role: jobRole,
+      skills,
+      level,
+      roadmap_result: roadmap,
+      progress
+    })
+    .select()
+    .single();
+
+  if (dbError) {
+    return res.status(500).json({ message: "로드맵 저장 실패", detail: dbError.message });
+  }
+
+  return res.status(201).json({ roadmap: data });
+});
+
+app.get("/api/roadmaps", requireAuth, async (req, res) => {
+  const { data, error } = await supabaseAdmin
+    .from("roadmaps")
+    .select("*")
+    .eq("user_id", req.user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ message: "로드맵 조회 실패", detail: error.message });
+  }
+
+  return res.json({ roadmaps: data });
+});
+
+app.patch("/api/roadmaps/:id/progress", requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { progress, roadmap } = req.body;
+
+  const { data, error } = await supabaseAdmin
+    .from("roadmaps")
+    .update({ progress, roadmap_result: roadmap })
+    .eq("id", id)
+    .eq("user_id", req.user.id)
+    .select()
+    .single();
+
+  if (error) {
+    return res.status(500).json({ message: "진행률 저장 실패", detail: error.message });
+  }
+
+  return res.json({ roadmap: data });
+});
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`기업둥이 server is running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
