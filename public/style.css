@@ -1481,7 +1481,34 @@ ol li {
     align-items: flex-start;
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 5px;
     margin-top: 8px;
+  }
+
+  .check-meta .priority-badge,
+  .check-meta span {
+    font-size: 10px;
+  }
+
+  .check-item {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .compact-card {
+    padding: 12px 14px;
+  }
+
+  .d-day-banner {
+    padding: 14px 16px;
+  }
+
+  .d-day-banner h3 {
+    font-size: 22px;
+  }
+
+  .roadmap-block {
+    padding: 14px;
   }
 
   /* Prevent iOS zoom and increase touch target */
