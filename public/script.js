@@ -53,6 +53,7 @@ const fields = {
   skills: document.querySelector("#skills"),
   targetPeriod: document.querySelector("#targetPeriod"),
   customTargetPeriod: document.querySelector("#customTargetPeriod"),
+  targetDateInput: document.querySelector("#targetDateInput"),
   certifications: document.querySelector("#certifications"),
   firstAction: document.querySelector("#firstAction"),
   portfolioDirection: document.querySelector("#portfolioDirection")
@@ -100,11 +101,15 @@ function getSelectedSkills() {
 
 function collectGoal() {
   const customJobRole = fields.customJobRole.value.trim();
-  const selectedSkills = getSelectedSkills();
+  const targetPeriod = fields.targetPeriod.value;
   const customTargetPeriod = fields.customTargetPeriod.value.trim();
-  let finalTargetPeriod = fields.targetPeriod.value;
-  if (finalTargetPeriod === "custom") {
+  const targetDateInput = fields.targetDateInput.value;
+
+  let finalTargetPeriod = targetPeriod;
+  if (targetPeriod === "custom") {
     finalTargetPeriod = customTargetPeriod;
+  } else if (targetPeriod === "date" && targetDateInput) {
+    finalTargetPeriod = "date:" + targetDateInput;
   }
 
   return {
@@ -766,6 +771,25 @@ function renderProgress() {
   const startDate = state.goal?.createdAt ? new Date(state.goal.createdAt) : new Date();
   const targetDays = getTargetDays(state.goal?.targetPeriod || state.roadmap?.estimatedPeriod);
   
+  // Dashboard Header
+  const jobRoleStr = state.goal?.jobRole || state.roadmap?.jobRole || "직무명 없음";
+  const roleEl = document.querySelector("#dashboardJobRole");
+  if (roleEl) roleEl.textContent = `${jobRoleStr} 준비`;
+  
+  const endMs = startDate.getTime() + (targetDays * 24 * 60 * 60 * 1000);
+  const endDate = new Date(endMs);
+  const formatDt = (d) => `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2, '0')}`;
+  const periodEl = document.querySelector("#dashboardPeriodText");
+  if (periodEl) {
+    periodEl.textContent = `${formatDt(startDate)} ~ ${formatDt(endDate)} (${state.goal?.targetPeriod || state.roadmap?.estimatedPeriod || targetDays + "일"})`;
+  }
+  
+  // Mock Job Postings
+  const mockJob1 = document.querySelector("#mockJob1");
+  const mockJob2 = document.querySelector("#mockJob2");
+  if (mockJob1) mockJob1.textContent = `네이버 - ${jobRoleStr}`;
+  if (mockJob2) mockJob2.textContent = `토스 - ${jobRoleStr}`;
+  
   const now = new Date();
   const elapsedMs = now - startDate;
   const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
@@ -948,16 +972,22 @@ goalForm.addEventListener("input", () => validateGoal(false));
 goalForm.addEventListener("change", () => validateGoal(false));
 
 fields.targetPeriod.addEventListener("change", () => {
+  fields.customTargetPeriod.classList.add("hidden");
+  fields.targetDateInput.classList.add("hidden");
+  fields.customTargetPeriod.value = "";
+  fields.targetDateInput.value = "";
+  
   if (fields.targetPeriod.value === "custom") {
     fields.customTargetPeriod.classList.remove("hidden");
     fields.customTargetPeriod.focus();
-  } else {
-    fields.customTargetPeriod.classList.add("hidden");
-    fields.customTargetPeriod.value = "";
+  } else if (fields.targetPeriod.value === "date") {
+    fields.targetDateInput.classList.remove("hidden");
+    fields.targetDateInput.focus();
   }
   validateGoal(false);
 });
 fields.customTargetPeriod.addEventListener("input", () => validateGoal(false));
+fields.targetDateInput.addEventListener("input", () => validateGoal(false));
 fields.jobRole.addEventListener("change", () => {
   if (fields.jobRole.value) {
     fields.customJobRole.value = "";
@@ -1152,13 +1182,22 @@ if (recalcPeriodButton) {
     recalcPeriodButton.parentElement.classList.remove("hidden");
   });
 
+  const newTargetDateLabel = document.querySelector("#newTargetDateLabel");
+  const newTargetDateInput = document.querySelector("#newTargetDateInput");
+  const customNewTargetPeriodLabel = document.querySelector("#customNewTargetPeriodLabel");
+
   newTargetPeriod.addEventListener("change", () => {
+    customNewTargetPeriodLabel.classList.add("hidden");
+    newTargetDateLabel.classList.add("hidden");
+    newCustomTargetPeriod.value = "";
+    newTargetDateInput.value = "";
+    
     if (newTargetPeriod.value === "custom") {
-      newCustomTargetPeriod.classList.remove("hidden");
+      customNewTargetPeriodLabel.classList.remove("hidden");
       newCustomTargetPeriod.focus();
-    } else {
-      newCustomTargetPeriod.classList.add("hidden");
-      newCustomTargetPeriod.value = "";
+    } else if (newTargetPeriod.value === "date") {
+      newTargetDateLabel.classList.remove("hidden");
+      newTargetDateInput.focus();
     }
   });
 
@@ -1170,12 +1209,22 @@ if (recalcPeriodButton) {
         alert("새로운 준비 기간을 입력해주세요.");
         return;
       }
+    } else if (periodVal === "date") {
+      if (!newTargetDateInput.value) {
+        alert("목표 날짜를 선택해주세요.");
+        return;
+      }
+      periodVal = "date:" + newTargetDateInput.value;
     }
 
     state.goal.targetPeriod = periodVal;
+    state.goal.createdAt = new Date().toISOString();
+    
     fields.targetPeriod.value = newTargetPeriod.value;
-    if (periodVal === "custom") {
+    if (newTargetPeriod.value === "custom") {
       fields.customTargetPeriod.value = newCustomTargetPeriod.value;
+    } else if (newTargetPeriod.value === "date") {
+      fields.targetDateInput.value = newTargetDateInput.value;
     }
     
     const completedTasks = (state.roadmap?.checklist || []).filter(item => item.done);

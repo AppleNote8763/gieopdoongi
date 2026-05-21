@@ -180,7 +180,8 @@
                   <option value="3개월">3개월 (8~12주)</option>
                   <option value="6개월">6개월 (24주)</option>
                   <option value="1년">1년 (52주)</option>
-                  <option value="custom">직접 입력</option>
+                  <option value="custom">텍스트 직접 입력</option>
+                  <option value="date">달력에서 목표일 선택</option>
                 </select>
                 <input
                   type="text"
@@ -188,6 +189,13 @@
                   class="hidden compact"
                   placeholder="예: 2개월, 8주 등 직접 입력"
                   autocomplete="off"
+                  style="margin-top: 8px;"
+                />
+                <input
+                  type="date"
+                  id="targetDateInput"
+                  class="hidden compact"
+                  style="margin-top: 8px;"
                 />
                 <small class="helper-text">선택한 기간에 맞추어 주차별 실행 과제가 설계됩니다.</small>
               </label>
@@ -263,101 +271,85 @@
               <h3>AI가 분석 중입니다</h3>
               <p>기업, 직무, 현재 역량을 기준으로 맞춤 로드맵을 생성하고 있습니다.</p>
             </div>
-
-            <div class="roadmap-content hidden" id="roadmapContent">
-              <div class="section-heading compact">
-                <p class="eyebrow">AI Roadmap</p>
-                <h2>맞춤형 취업 준비 로드맵</h2>
-                <p id="estimatedPeriod"></p>
-              </div>
-
-              <div class="insight-grid">
-                <article>
-                  <h3>필요한 핵심 기술</h3>
-                  <ul id="coreSkillsList"></ul>
-                </article>
-                <article>
-                  <h3>부족한 역량</h3>
-                  <ul id="gapsList"></ul>
-                </article>
-                <article>
-                  <h3>추천 학습 우선순위</h3>
-                  <ol id="priorityList"></ol>
-                </article>
-              </div>
-
-              <article class="roadmap-editor">
-                <h3>오늘 시작할 첫 번째 행동</h3>
-                <p id="firstAction" class="roadmap-text"></p>
-              </article>
-
-              <div class="week-list" id="weekList"></div>
-
-              <div class="insight-grid two-column">
-                <article>
-                  <h3>포트폴리오 준비 방향</h3>
-                  <p id="portfolioDirection" class="roadmap-text"></p>
-                </article>
-                <article>
-                  <h3>면접 준비 항목</h3>
-                  <ul id="interviewList"></ul>
-                </article>
-              </div>
-
-              <button class="primary-button full" id="startProgressButton" type="button">
-                진행 관리 시작하기
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section class="panel" id="progressPanel" tabindex="-1">
         <div class="dashboard-grid">
-          <aside class="summary-card">
-            <p class="eyebrow">Step 3</p>
-            <h2>진행 관리</h2>
-            <p id="progressSaveHint">로그인 후 저장한 로드맵만 진행률을 서버에 저장할 수 있습니다.</p>
-            <div id="progressSaveButtonRow" class="hidden" style="margin: 16px 0;">
+          <aside class="summary-card" style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Header: Role & Period -->
+            <div class="dashboard-header" style="border-bottom: 1px solid var(--line); padding-bottom: 16px;">
+              <p class="eyebrow">Roadmap Dashboard</p>
+              <h2 id="dashboardJobRole" style="margin: 4px 0; font-size: 20px;">직무명 로딩중...</h2>
+              <div style="display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-top: 8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span id="dashboardPeriodText">YYYY.MM ~ YYYY.MM (O개월)</span>
+              </div>
+            </div>
+
+            <!-- D-Day Banner -->
+            <div class="d-day-banner" style="background: var(--primary-soft); color: var(--primary); padding: 20px; border-radius: var(--radius); text-align: center;">
+              <h3 style="font-size: 28px; font-weight: 900; margin-bottom: 4px;" id="dDayBadge">D-??</h3>
+              <p style="font-size: 14px; font-weight: 600; opacity: 0.9;" id="dDayText">목표일까지 남은 시간 계산 중...</p>
+            </div>
+
+            <!-- Dual Progress -->
+            <div class="dashboard-progress-group">
+              <div class="progress-card" style="padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 12px; border-radius: var(--radius); box-shadow: none;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 13px; font-weight: 600; color: var(--ink);">업무 진행률</span>
+                  <strong id="progressPercent" style="color: var(--primary);">0%</strong>
+                </div>
+                <div class="progress-bar" aria-label="업무 진행률" style="height: 8px; margin-bottom: 8px;">
+                  <span id="progressFill"></span>
+                </div>
+                <p id="progressCount" style="font-size: 12px; color: var(--muted); text-align: right; margin: 0;">0 / 0 완료</p>
+              </div>
+              
+              <div class="progress-card" style="padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius); box-shadow: none;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 13px; font-weight: 600; color: var(--ink);">시간 진행률</span>
+                  <strong id="timeProgressPercent" style="color: var(--muted);">0%</strong>
+                </div>
+                <div class="progress-bar" aria-label="시간 진행률" style="height: 8px; margin-bottom: 8px;">
+                  <span id="timeProgressFill" style="background: var(--muted);"></span>
+                </div>
+                <p id="timeProgressCount" style="font-size: 12px; color: var(--muted); text-align: right; margin: 0;">0일 지남</p>
+              </div>
+            </div>
+
+            <p class="helper-text" id="remainingText" style="text-align: center; margin-top: -8px;"></p>
+
+            <!-- Certification / Job Postings Tracker -->
+            <div class="dashboard-widgets" style="display: flex; flex-direction: column; gap: 12px;">
+              <!-- Certification Card -->
+              <div id="certScheduleContainer" class="hidden" style="padding: 16px; border: 1px solid #cbd5e1; border-radius: var(--radius); background: #ffffff;">
+                <h4 style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  자격증 시험 일정
+                </h4>
+                <ul id="certScheduleList" style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--muted);"></ul>
+              </div>
+
+              <!-- Mock Job Postings Card -->
+              <div id="jobPostingsContainer" style="padding: 16px; border: 1px solid #cbd5e1; border-radius: var(--radius); background: #ffffff;">
+                <h4 style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  채용공고 현황
+                </h4>
+                <ul id="jobPostingList" style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--muted);">
+                  <li style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span id="mockJob1">네이버 - 프론트엔드</span> <strong style="color: var(--primary);">상시 채용</strong>
+                  </li>
+                  <li style="display: flex; justify-content: space-between;">
+                    <span id="mockJob2">토스 - 프론트엔드</span> <strong style="color: var(--primary);">D-45</strong>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Actions (Save & Recalculate) -->
+            <div class="dashboard-actions" style="border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 8px;">
               <button class="primary-button" id="progressSaveButton" type="button" style="width: 100%;">이 로드맵 저장하기</button>
-              <p class="helper-text" id="progressSaveStatus" style="margin-top: 8px; text-align: center; font-size: 13px;"></p>
-            </div>
-            <div class="d-day-banner" style="background: var(--primary-soft); color: var(--primary); padding: 16px; border-radius: var(--radius); margin-bottom: 16px; text-align: center;">
-              <h3 style="font-size: 24px; font-weight: 800; margin-bottom: 4px;" id="dDayBadge">D-??</h3>
-              <p style="font-size: 13px; font-weight: 600;" id="dDayText">목표일까지 남은 시간 계산 중...</p>
-            </div>
-
-            <div class="progress-card" style="margin-bottom: 12px;">
-              <div>
-                <span>업무 진행률</span>
-                <strong id="progressPercent">0%</strong>
-                <p id="progressCount">0 / 0 완료</p>
-              </div>
-              <div class="progress-bar" aria-label="업무 진행률">
-                <span id="progressFill"></span>
-              </div>
-            </div>
-            
-            <div class="progress-card" style="margin-bottom: 16px;">
-              <div>
-                <span>시간 진행률</span>
-                <strong id="timeProgressPercent">0%</strong>
-                <p id="timeProgressCount">0일 지남</p>
-              </div>
-              <div class="progress-bar" aria-label="시간 진행률">
-                <span id="timeProgressFill" style="background: var(--muted);"></span>
-              </div>
-            </div>
-            <p class="helper-text" id="remainingText"></p>
-
-            <div id="certScheduleContainer" class="hidden" style="margin-bottom: 16px; padding: 16px; border: 1px solid var(--primary); border-radius: var(--radius); background: #ffffff;">
-              <h4 style="font-size: 14px; font-weight: 700; color: var(--primary); margin-bottom: 8px;">🔥 다가오는 자격증 일정</h4>
-              <ul id="certScheduleList" style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--ink);">
-              </ul>
-            </div>
-            
-            <div style="margin-top: 16px;" id="recalcPeriodContainer">
-              <button class="outline-button" id="recalcPeriodButton" type="button" style="width: 100%; font-size: 13px;">📅 기간 재조정</button>
+              <button class="outline-button" id="recalcPeriodButton" type="button" style="width: 100%; font-size: 13px;">📅 로드맵 다시 최적화</button>
+              <p class="helper-text" id="progressSaveStatus" style="text-align: center; font-size: 12px; margin-top: 4px; display: none;"></p>
             </div>
             
             <div id="recalcPeriodForm" class="hidden" style="margin-top: 12px; padding: 16px; background: var(--page); border: 1px solid var(--line); border-radius: var(--radius-sm);">
@@ -368,9 +360,17 @@
                   <option value="3개월" selected>3개월 (8~12주)</option>
                   <option value="6개월">6개월 (24주)</option>
                   <option value="1년">1년 (52주)</option>
-                  <option value="custom">직접 입력</option>
+                  <option value="custom">텍스트 직접 입력</option>
+                  <option value="date">달력에서 목표일 선택</option>
                 </select>
-                <input type="text" id="newCustomTargetPeriod" class="hidden compact" placeholder="직접 입력 (예: 2주)" style="margin-top: 8px;" />
+              </label>
+              <label class="field hidden" id="customNewTargetPeriodLabel" style="margin-bottom: 12px;">
+                <span style="font-size: 13px;">직접 입력 (예: 2주, 45일)</span>
+                <input type="text" id="customNewTargetPeriod" class="compact" placeholder="예: 2주" />
+              </label>
+              <label class="field hidden" id="newTargetDateLabel" style="margin-bottom: 12px;">
+                <span style="font-size: 13px;">목표 날짜 선택</span>
+                <input type="date" id="newTargetDateInput" class="compact" />
               </label>
               <div style="display: flex; gap: 8px;">
                 <button class="primary-button compact" id="submitRecalcBtn" type="button" style="flex: 1; padding: 8px;">재조정 시작</button>
