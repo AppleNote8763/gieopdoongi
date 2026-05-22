@@ -46,6 +46,9 @@ const roleSuggestions = document.querySelector("#roleSuggestions");
 const skillHint = document.querySelector("#skillHint");
 const skillSuggestions = document.querySelector("#skillSuggestions");
 let draggedChecklistIndex = null;
+let progressSaveTimer = null;
+let progressSaveInFlight = false;
+let progressSaveQueued = false;
 
 function escapeHtml(value) {
   return String(value || "")
@@ -980,17 +983,67 @@ function renderSavedRoadmaps(roadmaps) {
   hint.textContent = "저장된 로드맵을 선택하면 진행률을 이어서 관리할 수 있습니다.";
 
   roadmaps.forEach((item) => {
-    const button = document.createElement("button");
-    button.className = "saved-item";
-    button.type = "button";
-    button.innerHTML = `
-      <strong>${item.company}</strong>
-      <span>${item.job_role} · ${item.level}</span>
-      <small>진행률 ${item.progress || 0}%</small>
-    `;
-    button.addEventListener("click", () => loadRoadmapFromRecord(item));
-    list.appendChild(button);
+    const row = document.createElement("div");
+    row.className = "saved-item";
+
+    const openButton = document.createElement("button");
+    openButton.className = "saved-item-open";
+    openButton.type = "button";
+
+    const company = document.createElement("strong");
+    company.textContent = item.company;
+    const meta = document.createElement("span");
+    meta.textContent = `${item.job_role} · ${item.level}`;
+    const progress = document.createElement("small");
+    progress.textContent = `진행률 ${item.progress || 0}%`;
+
+    openButton.append(company, meta, progress);
+    openButton.addEventListener("click", () => loadRoadmapFromRecord(item));
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "saved-delete-button";
+    deleteButton.type = "button";
+    deleteButton.textContent = "삭제";
+    deleteButton.setAttribute("aria-label", `${item.company} 로드맵 삭제`);
+    deleteButton.addEventListener("click", () => deleteSavedRoadmap(item));
+
+    row.append(openButton, deleteButton);
+    list.appendChild(row);
   });
+}
+
+async function deleteSavedRoadmap(item) {
+  if (!state.session) return;
+
+  const confirmed = window.confirm(`${item.company} 로드맵을 삭제할까요? 삭제한 데이터는 되돌릴 수 없습니다.`);
+  if (!confirmed) return;
+
+  const hint = document.querySelector("#savedRoadmapsHint");
+  hint.textContent = "로드맵을 삭제하는 중입니다...";
+
+  try {
+    const response = await fetch(`/api/roadmaps/${item.id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders()
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "로드맵 삭제에 실패했습니다.");
+    }
+
+    if (state.savedRoadmapId === item.id) {
+      state.savedRoadmapId = null;
+      if (progressSaveStatus) {
+        progressSaveStatus.textContent = "현재 열려 있던 로드맵이 삭제되었습니다. 다시 저장하면 새 로드맵으로 저장됩니다.";
+      }
+    }
+
+    hint.textContent = "로드맵을 삭제했습니다.";
+    await loadSavedRoadmaps();
+  } catch (error) {
+    hint.textContent = error.message || "로드맵 삭제 중 오류가 발생했습니다.";
+  }
 }
 
 function loadRoadmapFromRecord(record, { openProgress = true } = {}) {
@@ -1290,7 +1343,7 @@ function renderProgress() {
       checklist.splice(toIndex, 0, movedItem);
       draggedChecklistIndex = null;
       renderProgress();
-      await persistProgress();
+      schedulePersistProgress();
     });
 
     row.addEventListener("click", async (event) => {
@@ -1308,15 +1361,15 @@ function renderProgress() {
       }
 
       item.done = checkbox.checked;
-      await persistProgress();
       renderProgress();
+      schedulePersistProgress();
     });
 
     const durationInput = row.querySelector(".duration-edit input");
     durationInput.addEventListener("change", async () => {
       item.duration = durationInput.value.trim();
       item.durationEdited = true;
-      await persistProgress();
+      schedulePersistProgress();
     });
 
     checklistBox.appendChild(row);
@@ -1344,6 +1397,65 @@ async function persistProgress() {
       roadmap: state.roadmap
     })
   });
+}
+
+function schedulePersistProgress(delay = 350) {
+  syncEditableRoadmap();
+
+  if (!state.session || !state.savedRoadmapId) {
+    updateProgressHint();
+    return;
+  }
+
+  progressSaveQueued = true;
+  if (progressSaveStatus) {
+    progressSaveStatus.textContent = "변경사항 저장 대기 중...";
+  }
+
+  if (progressSaveTimer) {
+    clearTimeout(progressSaveTimer);
+  }
+
+  progressSaveTimer = setTimeout(() => {
+    progressSaveTimer = null;
+    flushQueuedProgressSave();
+  }, delay);
+}
+
+async function flushQueuedProgressSave() {
+  if (!progressSaveQueued) return;
+
+  if (progressSaveInFlight) {
+    return;
+  }
+
+  if (!state.session || !state.savedRoadmapId) {
+    progressSaveQueued = false;
+    updateProgressHint();
+    return;
+  }
+
+  progressSaveInFlight = true;
+  progressSaveQueued = false;
+  if (progressSaveStatus) {
+    progressSaveStatus.textContent = "자동 저장 중...";
+  }
+
+  try {
+    await persistProgress();
+    if (progressSaveStatus && !progressSaveQueued) {
+      progressSaveStatus.textContent = "자동 저장되었습니다.";
+    }
+  } catch (error) {
+    if (progressSaveStatus) {
+      progressSaveStatus.textContent = "자동 저장에 실패했습니다. 다음 변경 시 다시 저장합니다.";
+    }
+  } finally {
+    progressSaveInFlight = false;
+    if (progressSaveQueued) {
+      flushQueuedProgressSave();
+    }
+  }
 }
 
 on(goalForm, "input", () => validateGoal(false));

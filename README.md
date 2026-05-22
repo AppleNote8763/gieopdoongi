@@ -1,219 +1,51 @@
 # 기업뚱이
 
-AI 취업 준비 플래너 웹 서비스입니다. 사용자가 목표 기업, 희망 직무, 현재 보유 기술/역량, 경력 수준을 입력하면 Gemini API가 맞춤형 4주 취업 준비 로드맵을 생성합니다. Supabase Authentication으로 로그인한 사용자만 로드맵과 진행률을 사용자별로 저장하고 다시 불러올 수 있습니다.
+AI 기반 취업 준비 로드맵 서비스입니다. 목표 기업과 희망 직무를 입력하면 필요한 역량, 준비 일정, 체크리스트를 생성하고 진행 상황을 관리할 수 있습니다.
+
+## 주요 기능
+
+- 목표 기업 기반 직무 추천
+- 직무 기반 역량 추천 및 직접 입력
+- 준비 기간 선택: 1개월, 3개월, 6개월, 1년, 직접 입력, 달력 선택
+- 목표 자격증 입력 및 직무별 자격증 추천
+- Gemini API 기반 맞춤 취업 준비 로드맵 생성
+- 고용24 채용공고 연동 및 요구 역량 반영
+- 주요 자격증 시험 일정 안내
+- 체크리스트 완료 처리, 우선순위 변경, 예상 기간 수정
+- 학습 진행률과 시간 진행률 대시보드
+- 로드맵 다시 최적화
+- 로그인 사용자별 로드맵 저장, 불러오기, 삭제
 
 ## 기술 스택
 
-- HTML5
-- CSS3
-- Vanilla JavaScript
-- Node.js
-- Express.js
-- Supabase Authentication
-- Supabase Database
-- Gemini API
-- Vercel
-- GitHub
+- Frontend: HTML, CSS, Vanilla JavaScript
+- Backend: Node.js, Express
+- Auth/DB: Supabase
+- AI: Gemini API
+- 채용공고: 고용24 OpenAPI
+- 배포: Vercel
 
-## 프로젝트 구조
-
-```txt
-project-root/
-├── public/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-├── server.js
-├── package.json
-├── .env.example
-├── .gitignore
-├── vercel.json
-└── README.md
-```
-
-## 실행 방법
-
-1. 의존성을 설치합니다.
+## 실행
 
 ```bash
 npm install
-```
-
-2. `.env.example`을 복사해서 `.env` 파일을 만듭니다.
-
-```bash
-cp .env.example .env
-```
-
-Windows PowerShell에서는 다음 명령을 사용할 수 있습니다.
-
-```powershell
-Copy-Item .env.example .env
-```
-
-3. `.env`에 API 키를 입력합니다.
-
-```env
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash-lite
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-```
-
-4. 개발 서버를 실행합니다.
-
-```bash
 npm run dev
 ```
 
-5. 브라우저에서 접속합니다.
+접속 URL:
 
 ```txt
 http://localhost:3000
 ```
 
-## Supabase Authentication 설정
+환경 변수는 `.env.example`을 참고해 `.env`에 설정합니다.
 
-1. Supabase 프로젝트에서 Authentication > Providers로 이동합니다.
-2. Email provider를 활성화합니다.
-3. 개발 중 빠른 테스트를 원하면 Confirm email 옵션을 끌 수 있습니다.
-4. 실제 배포에서는 Confirm email을 켜는 것을 권장합니다.
-5. Project Settings > API에서 아래 값을 확인해 `.env`에 입력합니다.
-
-```txt
-SUPABASE_URL
-SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
+```env
+GEMINI_API_KEY=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+WORK24_API_KEY=
 ```
 
-`SUPABASE_ANON_KEY`는 브라우저에서 회원가입/로그인에 사용합니다. `SUPABASE_SERVICE_ROLE_KEY`는 서버에서 로그인 토큰을 검증하고 사용자별 데이터를 저장할 때만 사용합니다. service role key는 절대 프론트엔드에 노출하지 마세요.
-
-## Supabase Database 설정
-
-직접 생성해야 하는 테이블은 `public.roadmaps` 하나입니다. `auth.users`는 Supabase Authentication이 자동으로 관리하므로 직접 만들지 않습니다.
-
-SQL Editor에서 아래 SQL을 실행합니다. 같은 SQL은 [supabase/schema.sql](</c:/Users/user/Desktop/RoadUp AI/supabase/schema.sql>)에도 들어 있습니다.
-
-```sql
-create table if not exists public.roadmaps (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  company text not null,
-  job_role text not null,
-  skills text not null,
-  level text not null,
-  roadmap_result jsonb not null,
-  progress integer not null default 0 check (progress >= 0 and progress <= 100),
-  created_at timestamptz not null default now()
-);
-
-create index if not exists roadmaps_user_id_created_at_idx
-on public.roadmaps (user_id, created_at desc);
-```
-
-이 프로젝트는 Express 서버에서 service role key로 사용자 토큰을 검증한 뒤 `user_id` 조건을 걸어 조회/수정합니다. 그래서 클라이언트가 Supabase Database를 직접 호출하지 않습니다.
-
-현재 필요 없는 테이블:
-
-- `profiles`
-- `users`
-- `checklists`
-- `progress_logs`
-
-## 로그인 사용자 정책
-
-비로그인 사용자:
-
-- AI 로드맵 생성 가능
-- 로드맵 저장 불가
-- 진행률 서버 저장 불가
-- 이전 데이터 불러오기 불가
-
-로그인 사용자:
-
-- 이메일 회원가입
-- 이메일 로그인
-- 로그아웃
-- 로그인 상태 유지
-- 사용자별 로드맵 저장
-- 사용자별 이전 데이터 불러오기
-- 저장된 로드맵의 진행률 저장
-
-## 환경 변수 설명
-
-| 변수명 | 설명 |
-| --- | --- |
-| `GEMINI_API_KEY` | Gemini API 호출에 사용하는 서버 전용 키 |
-| `GEMINI_MODEL` | 선택 사항. 기본값은 `gemini-2.5-flash-lite` |
-| `SUPABASE_URL` | Supabase 프로젝트 URL |
-| `SUPABASE_ANON_KEY` | Supabase Auth 로그인/회원가입에 사용하는 공개 가능한 anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | 서버에서만 사용하는 service role key |
-
-## API 라우트
-
-### `GET /api/config`
-
-브라우저가 Supabase Auth를 초기화할 수 있도록 `SUPABASE_URL`, `SUPABASE_ANON_KEY`를 반환합니다. service role key는 반환하지 않습니다.
-
-### `POST /api/generate-roadmap`
-
-입력값을 기반으로 Gemini API를 호출해 로드맵을 생성합니다. 비로그인 사용자도 사용할 수 있습니다.
-
-```json
-{
-  "company": "삼성전자",
-  "jobRole": "백엔드 개발",
-  "skills": "Java, Spring Boot, SQL",
-  "level": "초급(신입)"
-}
-```
-
-### `POST /api/save-roadmap`
-
-로그인 사용자만 사용할 수 있습니다. `Authorization: Bearer <access_token>` 헤더가 필요합니다.
-
-### `GET /api/roadmaps`
-
-로그인한 사용자의 저장된 로드맵 목록만 조회합니다.
-
-### `PATCH /api/roadmaps/:id/progress`
-
-로그인한 사용자의 특정 로드맵 진행률만 수정합니다.
-
-## GitHub 업로드 방법
-
-```bash
-git init
-git add .
-git commit -m "Initial 기업뚱이 project"
-git remote add origin https://github.com/your-name/gieopdoongi.git
-git branch -M main
-git push -u origin main
-```
-
-## Vercel 배포 방법
-
-1. GitHub에 프로젝트를 업로드합니다.
-2. Vercel에서 New Project를 선택합니다.
-3. GitHub repository를 import합니다.
-4. Environment Variables에 아래 값을 추가합니다.
-
-```txt
-GEMINI_API_KEY
-GEMINI_MODEL
-SUPABASE_URL
-SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-```
-
-5. Deploy를 실행합니다.
-
-`vercel.json`이 포함되어 있어서 Vercel은 `server.js`를 Node.js 서버리스 함수로 실행하고, `public` 폴더의 정적 파일도 함께 제공합니다.
-
-## 보안 참고
-
-- Gemini API Key는 `public/script.js`에 작성하지 않습니다.
-- Supabase service role key는 서버 환경 변수로만 사용합니다.
-- Supabase anon key는 로그인/회원가입용 공개 키이며, service role key와 다릅니다.
-- `.env`는 `.gitignore`에 포함되어 GitHub에 업로드되지 않습니다.
+`WORK24_API_KEY`가 없어도 로드맵 생성과 저장 기능은 사용할 수 있으며, 채용공고 영역만 비어 있을 수 있습니다.

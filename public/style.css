@@ -679,16 +679,17 @@ textarea {
 
 .saved-item {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 14px 16px;
-  text-align: left;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink);
   background: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
   transition: all 0.2s ease;
+  overflow: hidden;
 }
 
 .saved-item:hover {
@@ -697,15 +698,29 @@ textarea {
   transform: translateX(2px);
 }
 
+.saved-item-open {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 0 14px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .saved-item strong {
   font-size: 14px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .saved-item span {
   font-size: 12px;
   color: var(--muted);
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .saved-item small {
@@ -716,6 +731,25 @@ textarea {
   padding: 2px 8px;
   border-radius: 4px;
   width: max-content;
+}
+
+.saved-delete-button {
+  align-self: stretch;
+  min-width: 54px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: rgba(241, 245, 249, 0.72);
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.saved-delete-button:hover {
+  background: #fff1f2;
+  color: #e11d48;
 }
 
 .auth-message {
@@ -1156,6 +1190,26 @@ ol li {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--page);
+}
+
+.recalc-form {
+  display: grid;
+  gap: 18px;
+}
+
+.recalc-form .field,
+.recalc-form .compact {
+  margin-bottom: 0;
+}
+
+.recalc-form .date-range-fields {
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.recalc-form .button-row {
+  margin-top: 2px;
 }
 
 .custom-checklist-form {

@@ -1182,6 +1182,28 @@ app.get("/api/roadmaps", requireAuth, async (req, res) => {
   return res.json({ roadmaps: data });
 });
 
+app.delete("/api/roadmaps/:id", requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  const { data, error } = await supabaseAdmin
+    .from("roadmaps")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", req.user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return res.status(500).json({ message: "로드맵 삭제 실패", detail: error.message });
+  }
+
+  if (!data) {
+    return res.status(404).json({ message: "삭제할 로드맵을 찾을 수 없습니다." });
+  }
+
+  return res.json({ id: data.id });
+});
+
 app.patch("/api/roadmaps/:id/progress", requireAuth, async (req, res) => {
   const { id } = req.params;
   const { progress, roadmap } = req.body;
